@@ -29,7 +29,7 @@ export function Cell({ children, onClick, label, padded, mobileOnly }: { childre
 
 export const Bar = ({ children }: { children: ReactNode }) => <div className={`${bar} border-b`}>{children}</div>
 export const ActionSlot = ({ children }: { children: ReactNode }) => <div className="self-stretch flex items-center">{children}</div>
-export const Placeholder = ({ text, children }: { text: string; children?: ReactNode }) => <div className="hero flex-1"><div className="hero-content text-center"><div><p className="text-base-content/30 text-xs">{text}</p>{children && <div className="mt-4">{children}</div>}</div></div></div>
+export const Placeholder = ({ text, children }: { text: string; children?: ReactNode }) => <div className="hero flex-1"><div className="hero-content text-center"><div>{children && <div className="mb-3 flex justify-center text-base-content/15">{children}</div>}<p className="text-base-content/30 text-xs">{text}</p></div></div></div>
 export const Content = ({ children }: { children: ReactNode }) => <div className="flex-1 min-h-0 flex flex-col bg-base-100">{children}</div>
 
 export function NavButton({ icon: Icon, label, active, onClick }: { icon: ComponentType<{ size?: number }>; label: string; active: boolean; onClick: () => void }) {
@@ -49,9 +49,9 @@ const Col = (base: string, inner = '') => ({ children, footer }: { children: Rea
   </div>
 )
 
-export const LeftColumn = Col('w-80 shrink-0 border-r border-base-300')
+export const LeftColumn = Col('w-80 shrink-0 border-r border-dashed border-base-300')
 export const CenterColumn = Col('flex-1 min-w-0 max-md:min-w-screen overflow-hidden', 'overflow-x-hidden')
-export const RightColumn = Col('w-80 shrink-0 border-l border-base-300')
+export const RightColumn = Col('w-80 shrink-0 border-l border-dashed border-base-300')
 
 export function Layout({ left, center, right, progress, leftOpen }: { left?: ReactNode; center: ReactNode; right?: ReactNode; progress?: boolean; leftOpen?: boolean }) {
   return (
@@ -67,7 +67,7 @@ export function Layout({ left, center, right, progress, leftOpen }: { left?: Rea
 // ── Components ───────────────────────────────────────────────────────
 
 export function Button({ children, color = 'primary', size = 'sm', outline, block, disabled, onClick }: {
-  children: ReactNode; color?: Color; size?: 'xs' | 'sm'; outline?: boolean; block?: boolean; disabled?: boolean; onClick?: () => void
+  children: ReactNode; color?: Color; size?: 'xs' | 'sm' | 'md' | 'lg'; outline?: boolean; block?: boolean; disabled?: boolean; onClick?: () => void
 }) { return <button className={`btn btn-${size} btn-${color} ${outline ? 'btn-outline' : ''} ${block ? 'btn-block' : ''}`} disabled={disabled} onClick={onClick}>{children}</button> }
 
 export function Input({ value, type, placeholder, onChange, onKeyDown }: {
@@ -94,11 +94,28 @@ export const Card = ({ title, children, color }: { title?: string; children: Rea
   <div className={`card ${color && color !== 'neutral' && color !== 'ghost' ? `bg-${color}/10` : 'bg-base-200'}`}><div className="card-body p-4 gap-2">{title && <h3 className="text-xs font-semibold text-base-content/60">{title}</h3>}{children}</div></div>
 
 export function Tabs({ tabs, active, onChange, variant = 'border' }: { tabs: { id: string; label: string }[]; active: string; onChange: (id: string) => void; variant?: 'border' | 'lift' | 'box' }) {
-  return <div role="tablist" className={`tabs tabs-${variant}`}>{tabs.map(t => <button key={t.id} role="tab" className={`tab ${t.id === active ? 'tab-active' : ''}`} onClick={() => onChange(t.id)}>{t.label}</button>)}</div>
+  return <div role="tablist" className={`tabs tabs-${variant}`}>{tabs.map(t => <button key={t.id} role="tab" className={`tab text-xs uppercase tracking-wider font-medium ${t.id === active ? 'tab-active' : ''}`} onClick={() => onChange(t.id)}>{t.label}</button>)}</div>
 }
 
 export const Heading = ({ title, subtitle }: { title: string; subtitle?: string }) =>
-  <div><h2 className="text-lg font-bold">{title}</h2>{subtitle && <p className="text-xs text-base-content/50 mt-1">{subtitle}</p>}</div>
+  <div className="py-2"><h2 className="text-2xl font-bold tracking-tight">{title}</h2>{subtitle && <p className="text-sm text-base-content/40 mt-2">{subtitle}</p>}</div>
+
+export const StepHeading = ({ step, title, subtitle, subtitleBelow }: { step?: string; title: string; subtitle?: string; subtitleBelow?: boolean }) =>
+  <div>
+    {subtitle && !subtitleBelow && <p className="text-xs uppercase tracking-wider font-medium text-base-content/40 mb-[18px]">{subtitle}</p>}
+    <h1 className="text-5xl font-black tracking-tight leading-none">{title}</h1>
+    {subtitle && subtitleBelow && <><div className="border-t border-base-content/5 mt-[30px] mb-[18px]" /><p className="text-xs uppercase tracking-wider font-medium text-base-content/40">{subtitle}</p></>}
+  </div>
+
+export const CheckItem = ({ label, checked }: { label: string; checked?: boolean }) =>
+  <div className="flex items-center gap-4 py-3">
+    <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${checked ? 'border-success bg-success' : 'border-base-content/15'}`}>
+      {checked && <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,5 4,7 8,3" /></svg>}
+    </div>
+    <span className={`text-xs tracking-wide ${checked ? 'text-base-content/70' : 'text-base-content/40'}`}>{label}</span>
+  </div>
+
+export const Divider = () => <div className="border-t border-base-content/5 my-2" />
 
 export function ProgressBar({ label, value, total, color = 'primary' }: { label?: string; value: number; total: number; color?: 'primary' | 'error' }) {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0
@@ -106,8 +123,22 @@ export function ProgressBar({ label, value, total, color = 'primary' }: { label?
 }
 
 export const Spinner = () => <span className="loading loading-spinner loading-xs" />
-export const Stack = ({ children }: { children: ReactNode }) => <div className="space-y-2">{children}</div>
-export const Page = ({ children }: { children: ReactNode }) => <div className="flex-1 overflow-y-auto p-4 space-y-4">{children}</div>
+export const Stack = ({ children, gap = 'sm' }: { children: ReactNode; gap?: 'sm' | 'md' | 'lg' }) => <div className={gap === 'lg' ? 'space-y-8' : gap === 'md' ? 'space-y-4' : 'space-y-2'}>{children}</div>
+export const Page = ({ children }: { children: ReactNode }) => <div className="flex-1 overflow-y-auto md:p-4 p-2 space-y-4">{children}</div>
+export const Stage = ({ children }: { children: ReactNode }) => <div className="max-w-2xl mx-auto w-full h-full rounded-xl bg-base-100 border border-base-200 p-[30px] overflow-y-auto shadow-xl">{children}</div>
+export const StageLayout = ({ top, bottom }: { top: ReactNode; bottom?: ReactNode }) =>
+  <div className="flex flex-col justify-end min-h-full gap-[78px]"><div>{top}</div>{bottom && <div className="shrink-0">{bottom}</div>}</div>
+export const Disclosure = ({ title, children, hint, open }: { title: string; children: ReactNode; hint?: string; open?: boolean }) =>
+  <details className="collapse collapse-arrow bg-base-200 rounded-lg" open={open}><summary className="collapse-title text-xs font-semibold min-h-0 py-3 px-5">{title}</summary><div className="collapse-content px-5 pb-4 space-y-3">{children}{hint && <p className="text-2xs text-base-content/30">{hint}</p>}</div></details>
+export const Dropzone = ({ children, disabled, onClick }: { children?: ReactNode; disabled?: boolean; onClick?: () => void }) =>
+  <div role="button" tabIndex={0} onClick={disabled ? undefined : onClick} onKeyDown={e => e.key === 'Enter' && !disabled && onClick?.()} className={`border-2 border-dashed border-primary/40 rounded-2xl p-8 text-center cursor-pointer transition-opacity ${disabled ? 'opacity-50 pointer-events-none' : 'hover:border-primary/60'}`}>{children}</div>
+
+export const FileAction = ({ icon: Icon, title, subtitle, disabled, onClick }: { icon: ComponentType<{ size?: number }>; title: string; subtitle?: string; disabled?: boolean; onClick?: () => void }) =>
+  <div role="button" tabIndex={0} onClick={disabled ? undefined : onClick} onKeyDown={e => e.key === 'Enter' && !disabled && onClick?.()}
+    className={`flex items-center gap-5 py-5 px-6 rounded-xl border border-base-content/8 transition-all ${disabled ? 'opacity-40 pointer-events-none' : 'cursor-pointer hover:border-base-content/20'}`}>
+    <Icon size={18} />
+    <div><p className="text-xs font-medium tracking-wide">{title}</p>{subtitle && <p className="text-xs text-base-content/25 mt-1">{subtitle}</p>}</div>
+  </div>
 export const Row = ({ children, justify = 'start' }: { children: ReactNode; justify?: 'start' | 'between' | 'end' | 'center' }) => <div className={`flex items-center gap-2 justify-${justify}`}>{children}</div>
 export const Text = ({ children, muted, size = 'xs' }: { children: ReactNode; muted?: boolean; size?: 'xs' | '2xs' }) => <p className={`text-${size} ${muted ? 'text-base-content/30' : ''}`}>{children}</p>
 export const RemoveButton = ({ onClick }: { onClick: () => void }) => <button className="text-error text-xs opacity-0 group-hover:opacity-50 transition-opacity" onClick={onClick} aria-label="Usuń">×</button>
@@ -134,7 +165,7 @@ export function Table({ columns, rows, pageSize, empty }: { columns: TableColumn
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto">
-        <table className="table table-sm table-zebra w-full">
+        <table className="table table-sm w-full">
           <thead><tr>{columns.map(c => <th key={c.key} className={al(c.align)}>{c.header}</th>)}</tr></thead>
           <tbody>{visible.map((row, i) => <tr key={i}>{columns.map(c => <td key={c.key} className={al(c.align)}>{row[c.key] ?? ''}</td>)}</tr>)}</tbody>
         </table>

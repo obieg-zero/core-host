@@ -19,5 +19,8 @@
   },
   {
     "pluginUri": "./plugin-data"
+  },
+  {
+    "pluginUri": "./plugin-workflow-designer"
   }
 ]

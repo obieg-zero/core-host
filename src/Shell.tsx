@@ -4,14 +4,17 @@ import { useHostStore } from './plugin'
 import { Layout, LeftColumn, CenterColumn, RightColumn, Bar, Cell, NavButton, ActionSlot, Content, LogBox, Placeholder, PluginErrorBoundary } from './ui'
 
 export const Shell = () => {
-  const { plugins, logs, activeId, leftOpen, progress } = useHostStore()
+  const plugins = useHostStore(s => s.plugins)
+  const activeId = useHostStore(s => s.activeId)
+  const leftOpen = useHostStore(s => s.leftOpen)
+  const progress = useHostStore(s => s.progress)
+  const hasLogs = useHostStore(s => s.logs.length > 0)
   const setActiveId = (id: string) => useHostStore.setState({ activeId: id })
 
   const routed = plugins.filter(p => p.layout?.center)
   const active = routed.find(p => p.id === activeId) ?? routed[0] ?? null
 
   const { left: Left, center: Center, right: Right, footer: Footer } = active?.layout ?? {}
-  const hasLogs = logs.length > 0
 
   useEffect(() => {
     if (active && activeId !== active.id) setActiveId(active.id)

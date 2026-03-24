@@ -1,5 +1,13 @@
 import Dexie from 'dexie'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useRef } from 'react'
+
+function useStableLiveQuery<T>(querier: () => Promise<T>, deps: any[], fallback: T): T {
+  const result = useLiveQuery(querier, deps, undefined as T | undefined)
+  const ref = useRef<T>(fallback)
+  if (result !== undefined) ref.current = result
+  return ref.current
+}
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -92,9 +100,9 @@ export function createStore(dbName = 'ozr-store'): Store {
         await db.posts.delete(cur)
       }
     },
-    usePosts(type) { return useLiveQuery(() => db.posts.where('type').equals(type).sortBy('createdAt'), [type], []) },
+    usePosts(type) { return useStableLiveQuery(() => db.posts.where('type').equals(type).sortBy('createdAt'), [type], []) },
     async setOption(key, value) { await db.options.put({ key, value }) },
-    useOption(key) { return useLiveQuery(() => db.options.get(key).then(o => o?.value), [key]) },
+    useOption(key) { return useStableLiveQuery(() => db.options.get(key).then(o => o?.value), [key], undefined) },
     async importJSON(nodes) {
       let count = 0
       const imp = async (node: SeedNode, parentId?: string) => {
