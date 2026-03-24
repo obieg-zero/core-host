@@ -3,7 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob: data:; connect-src 'self' https://raw.githubusercontent.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob: data: https://esm.sh https://cdn.jsdelivr.net; connect-src 'self' https://raw.githubusercontent.com https://esm.sh https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://api.openai.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self' blob: https://cdn.jsdelivr.net" />
+  <script type="importmap">
+  {
+    "imports": {
+      "pdfjs-dist": "https://esm.sh/pdfjs-dist@4.10.38",
+      "tesseract.js": "https://esm.sh/tesseract.js@5.1.1",
+      "@huggingface/transformers": "https://esm.sh/@huggingface/transformers@3.4.1"
+    }
+  }
+  </script>
   <link rel="icon" href="data:," />
   <title>plugin-host v2</title>
 </head>

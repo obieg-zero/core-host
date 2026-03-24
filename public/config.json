@@ -1,6 +1,23 @@
 [
-  { "pluginUri": "./plugin-darkmode", "defaultOptions": { "theme": "dracula" } },
-  
-  { "pluginUri": "./plugin-workflow-crm", "importData": ["workflows.json", "opponents.json"] },
-  { "pluginUri": "./plugin-data" }
+  {
+    "pluginUri": "./plugin-darkmode",
+    "defaultOptions": {
+      "theme": "dracula"
+    }
+  },
+  {
+    "pluginUri": "./plugin-workflow-crm",
+    "importData": [
+      "workflows.json",
+      "opponents.json"
+    ],
+    "defaultOptions": {
+      "openai_api_key": "",
+      "openai_api_url": "https://api.openai.com/v1/chat/completions",
+      "openai_model": "gpt-4o-mini"
+    }
+  },
+  {
+    "pluginUri": "./plugin-data"
+  }
 ]

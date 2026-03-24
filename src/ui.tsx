@@ -115,7 +115,7 @@ export const RemoveButton = ({ onClick }: { onClick: () => void }) => <button cl
 export function ListItem({ label, detail, active, onClick, action }: { label: ReactNode; detail?: ReactNode; active?: boolean; onClick?: () => void; action?: ReactNode }) {
   return (
     <div role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} onClick={onClick} onKeyDown={onClick ? e => e.key === 'Enter' && onClick() : undefined}
-      className={`flex items-center px-3 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${active ? 'bg-primary/10 text-primary' : 'hover:bg-base-200 text-base-content/60'}`}>
+      className={`group flex items-center px-3 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${active ? 'bg-primary/10 text-primary' : 'hover:bg-base-200 text-base-content/60'}`}>
       <div className="flex-1 min-w-0"><div className="truncate">{label}</div>{detail && <div className="text-xs text-base-content/30 mt-0.5">{detail}</div>}</div>
       {action && <div className="shrink-0 ml-2">{action}</div>}
     </div>

@@ -1,17 +1,40 @@
 [
   { "type": "workflow", "data": { "wfId": "wibor", "name": "Kredyt WIBOR", "stages": [
-    { "id": "dokument", "label": "1. Dokument", "color": "#3b82f6", "description": "Wgraj umowę kredytu i harmonogram", "blockType": "upload", "checklist": [{ "text": "Umowa kredytu", "type": "upload" }, { "text": "Harmonogram spłat", "type": "upload" }, { "text": "Aneksy", "type": "upload" }] },
-    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Wskaż istniejącego lub uzupełnij dane", "blockType": "form", "recordType": "case", "fields": [
+    { "id": "dokument", "label": "1. Dokument", "color": "#3b82f6", "description": "Wgraj umowę kredytu i harmonogram", "blockType": "upload",
+      "checklist": [{ "text": "Umowa kredytu", "type": "upload" }, { "text": "Harmonogram spłat", "type": "upload" }, { "text": "Aneksy", "type": "upload" }],
+      "pipeline": {
+        "ocr": { "language": "pol" },
+        "classify": { "labels": ["umowa_kredytu", "harmonogram", "aneks", "regulamin"], "minScore": 0.3 },
+        "embed": [
+          { "group": "umowa", "docs": ["umowa_kredytu", "aneks", "regulamin"], "chunkSize": 512 },
+          { "group": "harmonogram", "docs": ["harmonogram"], "chunkSize": 256 }
+        ],
+        "extract": {
+          "from": "umowa",
+          "method": "api",
+          "questions": {
+            "clientName": "Jak nazywa się kredytobiorca (osoba fizyczna)? Podaj TYLKO imię i nazwisko.",
+            "opponent": "Jaki bank udzielił tego kredytu? Podaj TYLKO nazwę banku.",
+            "loanNumber": "Jaki jest numer umowy kredytowej? Podaj TYLKO numer.",
+            "loanAmount": "Jaka jest kwota kredytu w PLN? Podaj TYLKO liczbę bez waluty.",
+            "loanDate": "Jaka jest data zawarcia umowy kredytowej? Podaj w formacie YYYY-MM-DD."
+          }
+        }
+      }
+    },
+    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Sprawdź dane klienta", "blockType": "form", "recordType": "case", "fields": [
       { "key": "clientName", "label": "Klient", "required": true },
       { "key": "clientPhone", "label": "Telefon klienta", "inputType": "tel" },
       { "key": "clientEmail", "label": "Email klienta", "inputType": "email" }
     ] },
-    { "id": "sprawa", "label": "3. Dane sprawy", "color": "#8b5cf6", "description": "Dane kredytu z dokumentów", "blockType": "form", "recordType": "case", "fields": [
-      { "key": "opponent", "label": "Bank", "required": true, "inputType": "select:opponent" },
-      { "key": "loanNumber", "label": "Nr umowy" },
-      { "key": "loanAmount", "label": "Kwota kredytu", "inputType": "number" },
-      { "key": "loanDate", "label": "Data umowy", "inputType": "date" }
-    ] },
+    { "id": "sprawa", "label": "3. Dane sprawy", "color": "#8b5cf6", "description": "Sprawdź dane kredytu", "blockType": "form", "recordType": "case",
+      "fields": [
+        { "key": "opponent", "label": "Bank", "required": true, "inputType": "select:opponent" },
+        { "key": "loanNumber", "label": "Nr umowy" },
+        { "key": "loanAmount", "label": "Kwota kredytu", "inputType": "number" },
+        { "key": "loanDate", "label": "Data umowy", "inputType": "date" }
+      ]
+    },
     { "id": "analiza", "label": "4. Analiza umowy", "color": "#8b5cf6", "description": "Klauzule abuzywne, ocena", "blockType": "upload", "checklist": [{ "text": "Wyciąg danych", "type": "extract" }, { "text": "Klauzule", "type": "extract" }] },
     { "id": "dec-viable", "label": "Czy sprawa ma szansę?", "color": "#f59e0b" },
     { "id": "kalkulacja", "label": "5. Kalkulacja", "color": "#8b5cf6", "description": "Nadpłaty WIBOR", "checklist": [{ "text": "Harmonogram", "type": "upload" }, { "text": "Kalkulacja", "type": "extract" }, { "text": "Wartość sporu", "type": "generate" }] },
@@ -34,18 +57,38 @@
     { "from": "apelacja", "to": "postepowanie" }
   ] } },
   { "type": "workflow", "data": { "wfId": "wibor-simple", "name": "WIBOR uproszczony", "stages": [
-    { "id": "dokument", "label": "1. Dokument", "color": "#3b82f6", "description": "Wgraj umowę kredytu", "blockType": "upload", "checklist": [{ "text": "Umowa kredytu", "type": "upload" }] },
-    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Wskaż istniejącego lub uzupełnij dane", "blockType": "form", "recordType": "case", "fields": [
+    { "id": "dokument", "label": "1. Dokument", "color": "#3b82f6", "description": "Wgraj umowę kredytu", "blockType": "upload",
+      "checklist": [{ "text": "Umowa kredytu", "type": "upload" }],
+      "pipeline": {
+        "ocr": { "language": "pol" },
+        "embed": [{ "group": "umowa", "docs": ["*"], "chunkSize": 512 }],
+        "extract": {
+          "from": "umowa",
+          "method": "api",
+          "questions": {
+            "clientName": "Jak nazywa się kredytobiorca (osoba fizyczna)? Podaj TYLKO imię i nazwisko.",
+            "opponent": "Jaki bank udzielił tego kredytu? Podaj TYLKO nazwę banku.",
+            "loanNumber": "Jaki jest numer umowy kredytowej? Podaj TYLKO numer.",
+            "loanAmount": "Jaka jest kwota kredytu w PLN? Podaj TYLKO liczbę bez waluty.",
+            "loanDate": "Jaka jest data zawarcia umowy? Format YYYY-MM-DD.",
+            "subject": "Jaki jest główny przedmiot umowy kredytowej? Odpowiedz krótko."
+          }
+        }
+      }
+    },
+    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Sprawdź dane klienta", "blockType": "form", "recordType": "case", "fields": [
       { "key": "clientName", "label": "Klient", "required": true },
       { "key": "clientPhone", "label": "Telefon klienta", "inputType": "tel" }
     ] },
-    { "id": "sprawa", "label": "3. Dane sprawy", "color": "#8b5cf6", "description": "Dane kredytu z dokumentów", "blockType": "form", "recordType": "case", "fields": [
-      { "key": "opponent", "label": "Bank", "required": true, "inputType": "select:opponent" },
-      { "key": "loanNumber", "label": "Nr umowy" },
-      { "key": "loanAmount", "label": "Kwota kredytu", "inputType": "number" },
-      { "key": "loanDate", "label": "Data umowy", "inputType": "date" },
-      { "key": "subject", "label": "Przedmiot roszczenia", "required": true }
-    ] },
+    { "id": "sprawa", "label": "3. Dane sprawy", "color": "#8b5cf6", "description": "Sprawdź dane kredytu", "blockType": "form", "recordType": "case",
+      "fields": [
+        { "key": "opponent", "label": "Bank", "required": true, "inputType": "select:opponent" },
+        { "key": "loanNumber", "label": "Nr umowy" },
+        { "key": "loanAmount", "label": "Kwota kredytu", "inputType": "number" },
+        { "key": "loanDate", "label": "Data umowy", "inputType": "date" },
+        { "key": "subject", "label": "Przedmiot roszczenia", "required": true }
+      ]
+    },
     { "id": "reklamacja", "label": "3. Reklamacja", "color": "#f59e0b", "description": "Reklamacja przedsądowa", "blockType": "upload", "checklist": [{ "text": "Reklamacja", "type": "generate" }, { "text": "Odpowiedź banku", "type": "upload" }] },
     { "id": "postepowanie", "label": "4. Postępowanie", "color": "#ef4444", "blockType": "timeline", "checklist": [{ "text": "Pozew", "type": "generate" }, { "text": "Rozprawy", "type": "manual" }] },
     { "id": "rozliczenie", "label": "5. Rozliczenie", "color": "#22c55e", "checklist": [{ "text": "Faktura", "type": "generate" }, { "text": "Zamknięcie", "type": "manual" }] }
