@@ -30,7 +30,6 @@ export interface PluginDef {
   description?: string
   version?: string
   icon?: ComponentType<{ size?: number }>
-  order?: number
   layout?: { left?: ComponentType; center?: ComponentType; right?: ComponentType; footer?: ComponentType }
   action?: ReactNode
   setup?: () => void
