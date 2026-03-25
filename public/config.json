@@ -6,7 +6,7 @@
     }
   },
   {
-    "pluginUri": "./plugin-workflow-crm",
+    "pluginUri": "obieg-zero/plugin-workflow-crm@main",
     "importData": [
       "workflows.json",
       "opponents.json"
@@ -18,9 +18,9 @@
     }
   },
   {
-    "pluginUri": "./plugin-wibor-calc"
+    "pluginUri": "obieg-zero/plugin-wibor-calc@main"
   },
   {
-    "pluginUri": "./plugin-data"
+    "pluginUri": "obieg-zero/plugin-data@main"
   }
 ]
