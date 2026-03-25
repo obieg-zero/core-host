@@ -1,12 +1,12 @@
 [
   {
-    "pluginUri": "./plugin-darkmode",
+    "pluginUri": "obieg-zero/plugin-darkmode@main",
     "defaultOptions": {
       "theme": "dracula"
     }
   },
   {
-    "pluginUri": "./plugin-workflow-crm",
+    "pluginUri": "obieg-zero/plugin-workflow-crm@main",
     "importData": [
       "workflows.json",
       "opponents.json"
@@ -18,6 +18,6 @@
     }
   },
   {
-    "pluginUri": "./plugin-data"
+    "pluginUri": "obieg-zero/plugin-data@main"
   }
 ]
