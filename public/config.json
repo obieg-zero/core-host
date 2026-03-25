@@ -22,5 +22,8 @@
   },
   {
     "pluginUri": "obieg-zero/plugin-data@main"
+  },
+  {
+    "pluginUri": "obieg-zero/plugin-manager@main"
   }
 ]
