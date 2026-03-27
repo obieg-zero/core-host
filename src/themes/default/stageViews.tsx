@@ -1,5 +1,26 @@
-import type { StageViewProps, StageView, SchemaField, TaskDef, BranchDef, StageDef, PostRecord } from '../../views'
-import { submitStageData } from '../../views'
+import type { StageViewProps, StageView, SchemaField, TaskDef, BranchDef, StageDef, PostRecord, StageViewStore } from '../../types'
+
+function submitStageData(
+  store: StageViewStore,
+  cas: PostRecord,
+  stage: StageDef,
+  data: Record<string, unknown>,
+): { linkedId?: string } {
+  const recordType = stage.recordType || 'case'
+  if (recordType === 'case') {
+    store.update(cas.id, data)
+    return {}
+  }
+  const refKey = `${recordType}Id`
+  const existingId = cas.data[refKey] as string | undefined
+  if (existingId && store.get(existingId)) {
+    store.update(existingId, data)
+    return { linkedId: existingId }
+  }
+  const rec = store.add(recordType, data, { parentId: cas.id })
+  store.update(cas.id, { [refKey]: rec.id })
+  return { linkedId: rec.id }
+}
 
 // ── View: SelectField ────────────────────────────────────────────────
 

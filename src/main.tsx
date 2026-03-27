@@ -4,11 +4,11 @@ import * as ReactDOM from 'react-dom'
 import * as jsxRuntime from 'react/jsx-runtime'
 import { createRoot } from 'react-dom/client'
 import * as icons from 'react-feather'
-import * as ui from './ui'
+import * as ui from './themes'
 import { FatalError } from './themes'
 import { create } from 'zustand'
-import { getAllPlugins, unregisterPlugin, log, loadOne, openFileDialog, registerView, registerParser, registerAction, getViews, getParsers, getActions } from './plugin'
-import { registerStageView, getStageView } from './views'
+import { getAllPlugins, unregisterPlugin, log, loadOne, openFileDialog, registerView, registerParser, registerAction, getViews, getParsers, getActions, setStoreAuth, getStoreAuth } from './plugin'
+import { registerStageView, getStageView } from './stageRegistry'
 import { zipSync, strToU8 } from 'fflate'
 import type { PluginDeps, SDK } from './plugin'
 import { useHostStore } from './plugin'
@@ -38,7 +38,7 @@ async function boot() {
     registerView: (id, def) => registerView(id, { ...def, pluginId: '_sdk' }),
     registerParser: (id, def) => registerParser(id, { ...def, pluginId: '_sdk' }),
     registerAction: (id, def) => registerAction(id, { ...def, pluginId: '_sdk' }),
-    getViews, getParsers, getActions, registerStageView, getStageView,
+    getViews, getParsers, getActions, registerStageView, getStageView, setStoreAuth, getStoreAuth,
     uploadFile: async (parentId: string) => {
       const file = await openFileDialog('*')
       if (!file) return null
@@ -108,6 +108,15 @@ async function boot() {
       await loadOne(spec, deps, integrity).catch(err => log(`${spec}: ${(err as Error).message}`, 'error'))
     }
   }
+  // Load saved store:// plugins (installed via plugin-manager)
+  const auth = store.get('__store_auth')
+  if (auth?.data?.licenseKey) setStoreAuth({ licenseKey: auth.data.licenseKey as string })
+  const saved = store.get('__plugin-manager')
+  const savedSpecs: string[] = saved?.data?.specs ?? []
+  for (const spec of savedSpecs) {
+    await loadOne(spec, deps).catch(err => log(`${spec}: ${(err as Error).message}`, 'error'))
+  }
+
   useHostStore.setState({ progress: false })
 }
 

@@ -1,9 +1,8 @@
 import type { ComponentType } from 'react'
-import { FormView, DecisionView, TimelineView, GenericView } from './themes'
+import type { PostRecord, SchemaField } from './store'
 
-// ── Types (self-contained, no workflow-engine dep) ──────────────────
+export type { PostRecord, SchemaField } from './store'
 
-export type SchemaField = { key: string; label: string; required?: boolean; inputType?: string }
 export type TaskDef = { text: string; type: string }
 export type BranchDef = { from: string; to: string; handle?: string; label?: string }
 export interface StageDef {
@@ -12,7 +11,6 @@ export interface StageDef {
   checklist?: TaskDef[]; fields?: SchemaField[]
   pipeline?: { ocr?: unknown; classify?: unknown; embed?: unknown; extract?: { questions?: Record<string, string> } }
 }
-export type PostRecord = { id: string; type: string; parentId: string | null; data: Record<string, any>; createdAt: number; updatedAt: number }
 export type GraphNode = { id: string; type?: string; position: { x: number; y: number }; data: StageDef & { label?: string; description?: string; checklist?: TaskDef[] } } & Record<string, any>
 export interface WorkflowDef { id: string; name: string; nodes: GraphNode[]; edges: any[]; stages: StageDef[]; branches: BranchDef[] }
 
@@ -55,48 +53,3 @@ export interface StageViewProps {
 }
 
 export type StageView = ComponentType<StageViewProps>
-
-// ── submitStageData (logic, no UI) ───────────────────────────────────
-
-export function submitStageData(
-  store: StageViewStore,
-  cas: PostRecord,
-  stage: StageDef,
-  data: Record<string, unknown>,
-): { linkedId?: string } {
-  const recordType = stage.recordType || 'case'
-  if (recordType === 'case') {
-    store.update(cas.id, data)
-    return {}
-  }
-  const refKey = `${recordType}Id`
-  const existingId = cas.data[refKey] as string | undefined
-  if (existingId && store.get(existingId)) {
-    store.update(existingId, data)
-    return { linkedId: existingId }
-  }
-  const rec = store.add(recordType, data, { parentId: cas.id })
-  store.update(cas.id, { [refKey]: rec.id })
-  return { linkedId: rec.id }
-}
-
-// ── View registry ────────────────────────────────────────────────────
-
-const builtinViews: Record<string, StageView> = {
-  form: FormView,
-  decision: DecisionView,
-  timeline: TimelineView,
-  generic: GenericView,
-}
-
-const customViews: Record<string, StageView> = {}
-
-export function registerStageView(name: string, component: StageView) {
-  customViews[name] = component
-}
-
-export function getStageView(node: GraphNode): StageView {
-  if (node.id.startsWith('dec')) return builtinViews.decision
-  const v = node.data.view || 'generic'
-  return customViews[v] || builtinViews[v] || builtinViews.generic
-}
