@@ -6,24 +6,12 @@
     }
   },
   {
-    "pluginUri": "obieg-zero/plugin-workflow-crm@main",
-    "importData": [
-      "workflows.json",
-      "opponents.json"
-    ],
-    "defaultOptions": {
-      "openai_api_key": "",
-      "openai_api_url": "https://api.openai.com/v1/chat/completions",
-      "openai_model": "gpt-4o-mini"
-    }
-  },
-  {
-    "pluginUri": "./plugin-wibor-calc"
-  },
-  {
     "pluginUri": "obieg-zero/plugin-data@main"
   },
   {
-    "pluginUri": "obieg-zero/plugin-manager@main"
+    "pluginUri": "./plugin-manager"
+  },
+  {
+    "pluginUri": "obieg-zero/plugin-wibor-calc@main"
   }
 ]

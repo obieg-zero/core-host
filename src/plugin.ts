@@ -71,6 +71,8 @@ export interface SDK {
   getActions(): ActionDef[]
   registerStageView(name: string, component: ComponentType<any>): void
   getStageView(node: any): ComponentType<any>
+  setStoreAuth(auth: StoreAuth | null): void
+  getStoreAuth(): StoreAuth | null
 }
 
 // ── Contribution Point Types ─────────────────────────────────────────
@@ -136,6 +138,16 @@ export const openFileDialog = (accept: string): Promise<File | null> =>
     el.click()
   })
 
+// ── Store auth ──────────────────────────────────────────────────────
+
+export type StoreAuth = { licenseKey: string }
+
+let _storeAuth: StoreAuth | null = null
+export const setStoreAuth = (auth: StoreAuth | null) => { _storeAuth = auth }
+export const getStoreAuth = () => _storeAuth
+
+const STORE_BASE = 'https://obieg-zero-store.gotoreadyai.workers.dev'
+
 // ── Loader ───────────────────────────────────────────────────────────
 
 const makeShim = (global: string) =>
@@ -147,6 +159,7 @@ const shims = () => { JSX_SHIM ??= makeShim('__jsx_runtime'); REACT_SHIM ??= mak
 
 const resolveUrl = (spec: string) =>
   spec.startsWith('./') ? new URL(`${spec}/index.mjs`, document.baseURI).href
+    : spec.startsWith('store://') ? `${STORE_BASE}/plugin/${spec.slice(8)}`
     : `https://raw.githubusercontent.com/${spec.split('@')[0]}/${spec.split('@')[1] ?? 'main'}/index.mjs`
 
 const sha256 = async (text: string) => {
@@ -156,7 +169,12 @@ const sha256 = async (text: string) => {
 
 const fetchModule = async (spec: string) => {
   shims()
-  const res = await fetch(resolveUrl(spec))
+  const headers: Record<string, string> = {}
+  if (spec.startsWith('store://')) {
+    const auth = getStoreAuth()
+    if (auth?.licenseKey) headers['Authorization'] = `Bearer ${auth.licenseKey}`
+  }
+  const res = await fetch(resolveUrl(spec), { headers })
   if (res.status === 429) throw new Error('429 — zbyt wiele żądań do GitHub, spróbuj ponownie za chwilę lub użyj lokalnej wersji pluginu')
   if (!res.ok) throw new Error(`${res.status}`)
   const raw = await res.text()
@@ -176,9 +194,10 @@ export const loadOne = async (spec: string, deps: PluginDeps, expectedHash?: str
   if (expectedHash && expectedHash !== hash) throw new Error('integrity mismatch')
   // TOFU
   const key = `integrity:${spec}`
-  const known = spec.startsWith('./') ? undefined : await deps.store.get(key)
+  const skipIntegrity = spec.startsWith('./') || spec.startsWith('store://')
+  const known = skipIntegrity ? undefined : await deps.store.get(key)
   if (known?.data?.hash && known.data.hash !== hash) throw new Error(`Plugin "${spec}" został zmodyfikowany — kod pluginu zmienił się od ostatniego użycia. Wyczyść dane przeglądarki aby zaakceptować nową wersję.`)
-  if (!known && !spec.startsWith('./')) await deps.store.add('_integrity', { hash, spec }, { id: key })
+  if (!known && !skipIntegrity) await deps.store.add('_integrity', { hash, spec }, { id: key })
   if (typeof mod.default !== 'function') throw new Error('no default export')
   // Deferred SDK: captures registrations, binds pluginId after factory returns
   const deferred: { views: [string, Omit<ViewDef, 'pluginId'>][]; parsers: [string, Omit<ParserDef, 'pluginId'>][]; actions: [string, Omit<ActionDef, 'pluginId'>][] } = { views: [], parsers: [], actions: [] }
@@ -194,5 +213,5 @@ export const loadOne = async (spec: string, deps: PluginDeps, expectedHash?: str
   for (const [id, p] of deferred.parsers) registerParser(id, { ...p, pluginId: def.id })
   for (const [id, a] of deferred.actions) registerAction(id, { ...a, pluginId: def.id })
   registerPlugin(def)
-  log(`${spec} (${Math.round(performance.now() - t)}ms)`, 'ok')
+  log(`Plugin "${def.label}" zaladowany (${Math.round(performance.now() - t)}ms)`, 'ok')
 }
