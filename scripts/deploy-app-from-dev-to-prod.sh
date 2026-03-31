@@ -7,19 +7,31 @@ echo "=== Build pluginow ==="
 cd "$ROOT/../plugins"
 npm run build
 
-echo "=== Bump patch version ==="
+echo "=== Bump minor version ==="
 cd "$ROOT"
 CURRENT=$(node -p "require('./package.json').version")
 IFS='.' read -r major minor patch <<< "$CURRENT"
-NEW="$major.$minor.$((patch + 1))"
+NEW="$major.$((minor + 1)).0"
 sed -i "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" "$ROOT/package.json"
 echo "  $CURRENT -> $NEW"
 
 echo "=== Build aplikacji ==="
 npx vite build
 
-echo "=== Config: @main -> @dev ==="
-sed -i 's/@main"/@dev"/g' "$ROOT/dist/config.json"
+echo "=== Config prod: tylko manager + darkmode ==="
+cat > "$ROOT/dist/config.json" << 'CONF'
+[
+  {
+    "pluginUri": "obieg-zero/plugin-manager@main"
+  },
+  {
+    "pluginUri": "obieg-zero/plugin-darkmode@main",
+    "defaultOptions": {
+      "theme": "dracula"
+    }
+  }
+]
+CONF
 
 echo "=== Lokalne pluginy (./plugin-*) kopiowane do dist ==="
 grep -oP '\./plugin-[^"]+' "$ROOT/dist/config.json" | while read spec; do
@@ -31,15 +43,15 @@ grep -oP '\./plugin-[^"]+' "$ROOT/dist/config.json" | while read spec; do
   fi
 done
 
-echo "=== Deploy na obieg-zero.github.io/dev/ ==="
+echo "=== Deploy na obieg-zero.github.io/app/ ==="
 cd "$ROOT/dist"
 rm -rf .git
 git init
-git checkout -b gh-pages
+git checkout -b main
 git add -A
-git commit -m "Deploy dev $(date +%Y-%m-%d_%H:%M)"
-git remote add origin https://github.com/obieg-zero/dev.git
-git push -u origin gh-pages --force
+git commit -m "Deploy prod $(date +%Y-%m-%d_%H:%M)"
+git remote add origin https://github.com/obieg-zero/obieg-zero.github.io.git
+git push -u origin main --force
 
 echo ""
-echo "=== Gotowe: https://obieg-zero.github.io/dev/ ==="
+echo "=== Gotowe: https://obieg-zero.github.io/ ==="

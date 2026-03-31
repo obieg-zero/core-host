@@ -1,34 +1,51 @@
 #!/bin/bash
 
-# Instrukcja tworzenia produktow w LemonSqueezy Dashboard
-# Slug = nazwa produktu = nazwa repo = runtime ID pluginu
+# Porownuje pluginy w GitHub org obieg-zero z produktami w LemonSqueezy
+# Wyswietla tabelke do dodania w dashboardzie
 #
 # Uzycie: ./scripts/setup-lemonsqueezy-products.sh
 
-echo "============================================"
-echo "  LemonSqueezy — dodawanie produktow"
-echo "============================================"
-echo ""
-echo "Otworz: https://app.lemonsqueezy.com/products"
-echo "Kliknij: + New Product"
-echo ""
-echo "============================================"
-echo "  Produkt 1: plugin-wibor-calc"
-echo "============================================"
-echo "  Name:        plugin-wibor-calc"
-echo "  Price:       PLN 4000"
-echo "  Description: Kalkulator nadplat WIBOR dla kancelarii"
-echo "  License Keys: WLACZ"
-echo ""
-echo "============================================"
-echo "  Produkt 2: plugin-workflow-crm"
-echo "============================================"
-echo "  Name:        plugin-workflow-crm"
-echo "  Price:       PLN 0 (darmowy)"
-echo "  Description: Zarzadzanie sprawami, klientami i dokumentami"
-echo "  License Keys: WLACZ"
-echo ""
-echo "============================================"
-echo "  Po utworzeniu uruchom:"
-echo "  LEMONSQUEEZY_API_KEY=xxx ./scripts/sync-lemonsqueezy-worker.sh"
-echo "============================================"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+[ -f "$ROOT/.env" ] && export $(grep -v '^#' "$ROOT/.env" | xargs)
+
+if [ -z "$LEMONSQUEEZY_API_KEY" ]; then
+  echo "Brak LEMONSQUEEZY_API_KEY w .env"
+  exit 1
+fi
+
+GH_REPOS=$(gh repo list obieg-zero --limit 100 --json name,description --jq '.[] | select(.name | startswith("plugin-")) | "\(.name)\t\(.description)"' | sort)
+
+LS_PRODUCTS=$(curl -s "https://api.lemonsqueezy.com/v1/products" \
+  -H "Authorization: Bearer $LEMONSQUEEZY_API_KEY" \
+  -H "Accept: application/vnd.api+json" \
+  | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for p in data['data']:
+    print(p['attributes']['slug'])
+" | sort)
+
+printf "\n"
+printf "  %-25s %-50s %s\n" "NAZWA" "OPIS" "STATUS"
+printf "  %-25s %-50s %s\n" "-------------------------" "--------------------------------------------------" "------"
+
+MISSING=0
+while IFS=$'\t' read -r name desc; do
+  if echo "$LS_PRODUCTS" | grep -qx "$name"; then
+    status="OK"
+  else
+    status="BRAK"
+    MISSING=$((MISSING + 1))
+  fi
+  printf "  %-25s %-50s %s\n" "$name" "$desc" "$status"
+done <<< "$GH_REPOS"
+
+printf "\n"
+if [ $MISSING -eq 0 ]; then
+  echo "  Wszystko zsynchronizowane!"
+else
+  echo "  Brakuje $MISSING produktow w LemonSqueezy."
+  echo "  Dodaj je recznie: https://app.lemonsqueezy.com/products"
+fi
+printf "\n"

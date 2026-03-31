@@ -2,3 +2,4 @@ node_modules
 dist
 documents
 .claude/settings.local.json
+.env

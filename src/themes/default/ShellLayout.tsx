@@ -3,6 +3,7 @@ import { Menu, ChevronLeft } from 'react-feather'
 import { Layout, LeftColumn, CenterColumn, RightColumn, Bar, Content, ActionSlot } from './columns'
 import { Cell, Placeholder } from '@obieg-zero/sdk/src/ui'
 import { NavButton, LogBox, PluginErrorBoundary, type LogEntry } from './chrome'
+import { version } from '../../../package.json'
 
 export interface PluginNav {
   id: string
@@ -49,7 +50,7 @@ export function ShellLayout({
         <CenterColumn footer={
           <Bar>
             <Cell label>{Footer && <PluginErrorBoundary><Footer /></PluginErrorBoundary>}</Cell>
-            <Cell padded><span className="opacity-40">v2</span></Cell>
+            <Cell padded><span className="opacity-40">v{version}</span></Cell>
           </Bar>
         }>
           <Bar>

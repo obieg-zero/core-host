@@ -1,41 +1,5 @@
 # Obieg Zero — core-host
 
-## !!! KRYTYCZNE OSTRZEŻENIE — DEPLOY — PRZECZYTAJ ZANIM COKOLWIEK ZROBISZ !!!
-
-**OD MIESIĘCY KAŻDA INSTANCJA CLAUDE NISZCZY PROCES DEPLOY PLUGINÓW.**
-**TEN KOMUNIKAT ZOSTAJE DOPÓKI NIE ZOSTANIE WYPRACOWANA PEŁNA DOKUMENTACJA DEPLOY W TYM PLIKU.**
-
-### Co się psuje i dlaczego
-
-Gdy instancja commituje zmiany w pluginach, po kolei rozpierdalane są: localhost, dev i prod.
-Powody:
-- Instancje nie rozumieją zależności między config.json, build pluginów, i deploy
-- Instancje samowolnie odpalają skrypty deploy bez pełnego zrozumienia pipeline'u
-- Instancje zmieniają config.json i zostawiają go w złym stanie
-- Instancje pushują kod bez potwierdzenia usera
-
-### NAJWAŻNIEJSZA ZASADA
-
-**Commit i push IDZIE TYLKO PRZEZ SKRYPTY z `scripts/`.** Instancja NIGDY sama nie robi `git add`, `git commit`, `git push` w kontekście deploy. Skrypty robią to za Ciebie — Twoim jedynym zadaniem jest uruchomić odpowiedni skrypt (po zgodzie usera).
-
-### BEZWZGLĘDNE ZAKAZY przy pracy z pluginami i deploy
-
-1. **NIGDY** nie rób ręcznie `git commit` / `git push` jako część procesu deploy — od tego są skrypty
-2. **NIGDY** nie uruchamiaj żadnego skryptu z `scripts/` bez wyraźnej zgody usera
-3. **NIGDY** nie zmieniaj `public/config.json` bez wyraźnej zgody usera
-4. **PRZED** jakąkolwiek pracą z pluginami/deploy — przeczytaj WSZYSTKIE skrypty w `scripts/` i zrozum cały pipeline
-5. **ZAWSZE** pokaż userowi dokładnie co zamierzasz zrobić i poczekaj na potwierdzenie
-
-### Obecne skrypty deploy (przeczytaj je ZANIM cokolwiek zrobisz!)
-
-- `scripts/deploy-app-to-dev.sh` — buduje app + pluginy, podmienia config na @dev, deployuje na gh-pages dev
-- `scripts/deploy-app-to-prod.sh` — buduje app + pluginy, deployuje na gh-pages prod
-- `scripts/deploy-plugin-from-dev-to-prod.sh` — promuje plugin z dev → prod (merge + version bump)
-
-**TODO: Tu musi powstać pełna dokumentacja deploy pipeline — krok po kroku, ze stanami config.json, kolejnością operacji, i checklistą. Dopóki tego nie ma, ten warning zostaje.**
-
----
-
 WordPress w przeglądarce. Zustand + IndexedDB, sandbox pluginów, zero backendu.
 
 ## Zasady
