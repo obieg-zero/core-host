@@ -1,25 +1,18 @@
 import type { StageViewProps, StageView, SchemaField, TaskDef, BranchDef, StageDef, PostRecord, StageViewStore } from '../../types'
 
-function submitStageData(
-  store: StageViewStore,
-  cas: PostRecord,
-  stage: StageDef,
-  data: Record<string, unknown>,
-): { linkedId?: string } {
-  const recordType = stage.recordType || 'case'
-  if (recordType === 'case') {
-    store.update(cas.id, data)
-    return {}
-  }
-  const refKey = `${recordType}Id`
+const parseStep = (label?: string) => ({
+  step: label?.match(/^(\d+)/)?.[1],
+  title: (label || '').replace(/^\d+\.\s*/, ''),
+})
+
+function submitStageData(store: StageViewStore, cas: PostRecord, stage: StageDef, data: Record<string, unknown>) {
+  const rt = stage.recordType || 'case'
+  if (rt === 'case') { store.update(cas.id, data); return }
+  const refKey = `${rt}Id`
   const existingId = cas.data[refKey] as string | undefined
-  if (existingId && store.get(existingId)) {
-    store.update(existingId, data)
-    return { linkedId: existingId }
-  }
-  const rec = store.add(recordType, data, { parentId: cas.id })
+  if (existingId && store.get(existingId)) { store.update(existingId, data); return }
+  const rec = store.add(rt, data, { parentId: cas.id })
   store.update(cas.id, { [refKey]: rec.id })
-  return { linkedId: rec.id }
 }
 
 // ── View: SelectField ────────────────────────────────────────────────
@@ -44,8 +37,7 @@ export function SelectField({ field, bind, store, ui }: {
 // ── View: FormView ───────────────────────────────────────────────────
 
 export function FormView({ node, cas, wf, store, sdk, ui, advanceToStage, getNextStage }: StageViewProps) {
-  const stepNum = node.data.label?.match(/^(\d+)/)?.[1]
-  const title = (node.data.label || '').replace(/^\d+\.\s*/, '')
+  const { step: stepNum, title } = parseStep(node.data.label)
   const stage = wf.stages.find((s: StageDef) => s.id === node.id)!
   const recordType = stage.recordType || 'case'
   const isLinked = recordType !== 'case'
@@ -80,7 +72,7 @@ export function FormView({ node, cas, wf, store, sdk, ui, advanceToStage, getNex
 // ── View: DecisionView ───────────────────────────────────────────────
 
 export function DecisionView({ node, cas, wf, ui, advanceToStage }: StageViewProps) {
-  const title = (node.data.label || '').replace(/^\d+\.\s*/, '')
+  const { title } = parseStep(node.data.label)
   return (
     <ui.Page><ui.Stage><ui.StageLayout
       top={<ui.StepHeading title={title} subtitle="Wybierz dalsze działanie" />}
@@ -103,8 +95,7 @@ const TL_ICON: Record<string, string> = {
 }
 
 export function TimelineView({ node, cas, wf, ui, sdk, icons, store, uploadFile, downloadFile, useEvents, advanceToStage, getNextStage }: StageViewProps) {
-  const stepNum = node.data.label?.match(/^(\d+)/)?.[1]
-  const title = (node.data.label || '').replace(/^\d+\.\s*/, '')
+  const { step: stepNum, title } = parseStep(node.data.label)
   const events = useEvents(cas.id)
   const { form, bind, set } = sdk.useForm({ kind: 'notatka', text: '', date: '' })
   const KINDS = [{ value: 'notatka', label: 'Notatka' }, { value: 'termin', label: 'Termin' }]
@@ -170,8 +161,7 @@ export function TimelineView({ node, cas, wf, ui, sdk, icons, store, uploadFile,
 // ── View: GenericView ────────────────────────────────────────────────
 
 export function GenericView({ node, cas, wf, ui, advanceToStage, getNextStage }: StageViewProps) {
-  const stepNum = node.data.label?.match(/^(\d+)/)?.[1]
-  const title = (node.data.label || '').replace(/^\d+\.\s*/, '')
+  const { step: stepNum, title } = parseStep(node.data.label)
   const nextId = getNextStage(wf, node.id)
   const cl = node.data.checklist || []
   return (

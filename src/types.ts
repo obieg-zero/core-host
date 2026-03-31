@@ -11,8 +11,9 @@ export interface StageDef {
   checklist?: TaskDef[]; fields?: SchemaField[]
   pipeline?: { ocr?: unknown; classify?: unknown; embed?: unknown; extract?: { questions?: Record<string, string> } }
 }
-export type GraphNode = { id: string; type?: string; position: { x: number; y: number }; data: StageDef & { label?: string; description?: string; checklist?: TaskDef[] } } & Record<string, any>
-export interface WorkflowDef { id: string; name: string; nodes: GraphNode[]; edges: any[]; stages: StageDef[]; branches: BranchDef[] }
+export type GraphNode = { id: string; type?: string; position: { x: number; y: number }; data: StageDef & { label?: string; description?: string; checklist?: TaskDef[] } } & Record<string, unknown>
+export type EdgeDef = { id: string; source: string; target: string; label?: string }
+export interface WorkflowDef { id: string; name: string; nodes: GraphNode[]; edges: EdgeDef[]; stages: StageDef[]; branches: BranchDef[] }
 
 export interface StageViewStore {
   add(type: string, data: Record<string, unknown>, opts?: { parentId?: string }): PostRecord

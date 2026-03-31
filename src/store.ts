@@ -103,7 +103,14 @@ export async function createStore(): Promise<Store> {
   })
 
   const types = new Map<string, PostType>()
-  const postsCache = new Map<string, { key: string; result: PostRecord[] }>()
+  const cache = new Map<string, { key: string; result: PostRecord[] }>()
+  const cached = (tag: string, items: PostRecord[]) => {
+    const key = items.map(p => p.id + ':' + p.updatedAt).join(',')
+    const prev = cache.get(tag)
+    if (prev?.key === key) return prev.result
+    cache.set(tag, { key, result: items })
+    return items
+  }
 
   const read = () => useDataStore.getState()
   const write = (fn: (s: DataState) => Partial<DataState>) => useDataStore.setState(fn)
@@ -167,24 +174,13 @@ export async function createStore(): Promise<Store> {
 
     usePosts(type) {
       const posts = useDataStore(s => s.posts)
-      const filtered = Object.values(posts).filter(p => p.type === type).sort((a, b) => a.createdAt - b.createdAt)
-      const key = filtered.map(p => p.id + ':' + p.updatedAt).join(',')
-      const cached = postsCache.get(type)
-      if (cached && cached.key === key) return cached.result
-      postsCache.set(type, { key, result: filtered })
-      return filtered
+      return cached(type, Object.values(posts).filter(p => p.type === type).sort((a, b) => a.createdAt - b.createdAt))
     },
 
     useChildren(parentId, type?) {
       const posts = useDataStore(s => s.posts)
       if (!parentId) return []
-      const filtered = Object.values(posts).filter(p => p.parentId === parentId && (!type || p.type === type)).sort((a, b) => a.createdAt - b.createdAt)
-      const cacheKey = `ch:${parentId}:${type || '*'}`
-      const key = filtered.map(p => p.id + ':' + p.updatedAt).join(',')
-      const cached = postsCache.get(cacheKey)
-      if (cached && cached.key === key) return cached.result
-      postsCache.set(cacheKey, { key, result: filtered })
-      return filtered
+      return cached(`ch:${parentId}:${type || '*'}`, Object.values(posts).filter(p => p.parentId === parentId && (!type || p.type === type)).sort((a, b) => a.createdAt - b.createdAt))
     },
 
     setOption(key, value) { write(s => ({ options: { ...s.options, [key]: value } })) },

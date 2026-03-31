@@ -27,7 +27,7 @@ interface ConfigEntry {
 }
 
 async function boot() {
-  const config: unknown = await fetch('./config.json').then(r => r.json()).catch(() => ({}))
+  const config: unknown = await fetch('./config.json').then(r => r.json()).catch(e => { log(`config.json: ${e.message}`, 'error'); return {} })
   const store = await createStore()
   const shared = create(() => ({} as Record<string, unknown>))
   type FormData = Record<string, unknown>
@@ -48,10 +48,9 @@ async function boot() {
       return ev
     },
     downloadFile: async (postId: string, filename: string) => {
-      const f = await store.readFile(postId, filename)
-      const u = URL.createObjectURL(f)
-      Object.assign(document.createElement('a'), { href: u, download: filename }).click()
-      URL.revokeObjectURL(u)
+      const u = URL.createObjectURL(await store.readFile(postId, filename))
+      try { Object.assign(document.createElement('a'), { href: u, download: filename }).click() }
+      finally { URL.revokeObjectURL(u) }
     },
     zip: (files: Record<string, Uint8Array | string>) => {
       const mapped: Record<string, Uint8Array> = {}
@@ -77,8 +76,8 @@ async function boot() {
 
   root.render(<Shell />)
 
-  // Load entries: [{pluginUri, importData, defaultOptions}]
   const entries: ConfigEntry[] = Array.isArray(config) ? config : []
+  const toLoad: { spec: string; integrity?: string }[] = []
   useHostStore.setState({ progress: true })
   for (const entry of entries) {
     // Default options (once)
@@ -101,20 +100,20 @@ async function boot() {
         log(`${src}: ${count} rekordów`, 'ok')
       } catch (e) { log(`${src}: ${(e as Error).message}`, 'error') }
     }
-    // Load plugin
+    // Collect plugin spec
     if (entry.pluginUri) {
       const spec = typeof entry.pluginUri === 'string' ? entry.pluginUri : entry.pluginUri.spec
       const integrity = typeof entry.pluginUri === 'object' ? entry.pluginUri.integrity : undefined
-      await loadOne(spec, deps, integrity).catch(err => log(`${spec}: ${(err as Error).message}`, 'error'))
+      toLoad.push({ spec, integrity })
     }
   }
-  // Load saved store:// plugins (installed via plugin-manager)
+  // Add saved store:// plugins (installed via plugin-manager)
   const auth = store.get('__store_auth')
   if (auth?.data?.licenseKey) setStoreAuth({ licenseKey: auth.data.licenseKey as string })
-  const saved = store.get('__plugin-manager')
-  const savedSpecs: string[] = saved?.data?.specs ?? []
-  for (const spec of savedSpecs) {
-    await loadOne(spec, deps).catch(err => log(`${spec}: ${(err as Error).message}`, 'error'))
+  for (const spec of (store.get('__plugin-manager')?.data?.specs ?? []) as string[]) toLoad.push({ spec })
+  // Load all plugins
+  for (const { spec, integrity } of toLoad) {
+    await loadOne(spec, deps, integrity).catch(err => log(`${spec}: ${(err as Error).message}`, 'error'))
   }
 
   useHostStore.setState({ progress: false })

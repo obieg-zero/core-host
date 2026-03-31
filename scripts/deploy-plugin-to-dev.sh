@@ -28,6 +28,7 @@ publish_one() {
   fi
 
   cp "$dir/index.mjs" ./index.mjs
+  [ -f "$dir/package.json" ] && cp "$dir/package.json" ./package.json
   git add -A
 
   if git diff --cached --quiet; then

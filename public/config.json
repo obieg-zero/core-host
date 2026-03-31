@@ -12,6 +12,9 @@
     "pluginUri": "./plugin-manager"
   },
   {
-    "pluginUri": "obieg-zero/plugin-wibor-calc@main"
+    "pluginUri": "./plugin-wibor-calc"
+  },
+  {
+    "pluginUri": "./plugin-workflow-crm"
   }
 ]

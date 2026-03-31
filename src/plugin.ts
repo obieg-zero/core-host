@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react'
+import { shouldCache, opfsRead, opfsWrite } from './opfs'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Store, PostRecord } from './store'
@@ -167,8 +168,31 @@ const sha256 = async (text: string) => {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
 }
 
+const shimCode = (raw: string) => raw
+  .replace(/["']react\/jsx-(?:dev-)?runtime["']/g, `"${JSX_SHIM}"`)
+  .replace(/["']react-dom["']/g, `"${REACT_DOM_SHIM}"`)
+  .replace(/["']react["']/g, `"${REACT_SHIM}"`)
+
+const evalModule = async (code: string) => {
+  const blob = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }))
+  try { return await import(/* @vite-ignore */ blob) }
+  finally { URL.revokeObjectURL(blob) }
+}
+
 const fetchModule = async (spec: string) => {
   shims()
+  const useCache = shouldCache(spec)
+
+  // OPFS cache hit
+  if (useCache) {
+    const cached = await opfsRead(spec)
+    if (cached) {
+      const code = shimCode(cached)
+      return { mod: await evalModule(code), hash: await sha256(cached), fromCache: true }
+    }
+  }
+
+  // Fetch from network
   const headers: Record<string, string> = {}
   if (spec.startsWith('store://')) {
     const auth = getStoreAuth()
@@ -179,18 +203,18 @@ const fetchModule = async (spec: string) => {
   if (!res.ok) throw new Error(`${res.status}`)
   const raw = await res.text()
   const hash = await sha256(raw)
-  const code = raw
-    .replace(/["']react\/jsx-(?:dev-)?runtime["']/g, `"${JSX_SHIM}"`)
-    .replace(/["']react-dom["']/g, `"${REACT_DOM_SHIM}"`)
-    .replace(/["']react["']/g, `"${REACT_SHIM}"`)
-  const blob = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }))
-  try { return { mod: await import(/* @vite-ignore */ blob), hash } }
-  finally { URL.revokeObjectURL(blob) }
+
+  if (useCache) {
+    await opfsWrite(spec, raw).catch(() => {})
+  }
+
+  const code = shimCode(raw)
+  return { mod: await evalModule(code), hash, fromCache: false }
 }
 
 export const loadOne = async (spec: string, deps: PluginDeps, expectedHash?: string) => {
   const t = performance.now()
-  const { mod, hash } = await fetchModule(spec)
+  const { mod, hash, fromCache } = await fetchModule(spec)
   if (expectedHash && expectedHash !== hash) throw new Error('integrity mismatch')
   // TOFU
   const key = `integrity:${spec}`
@@ -213,5 +237,6 @@ export const loadOne = async (spec: string, deps: PluginDeps, expectedHash?: str
   for (const [id, p] of deferred.parsers) registerParser(id, { ...p, pluginId: def.id })
   for (const [id, a] of deferred.actions) registerAction(id, { ...a, pluginId: def.id })
   registerPlugin(def)
-  log(`Plugin "${def.label}" zaladowany (${Math.round(performance.now() - t)}ms)`, 'ok')
+  const src = fromCache ? 'OPFS' : 'sieć'
+  log(`Plugin "${def.label}" zaladowany z ${src} (${Math.round(performance.now() - t)}ms)`, 'ok')
 }
