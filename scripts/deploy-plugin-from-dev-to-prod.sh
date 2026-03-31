@@ -57,7 +57,17 @@ promote_one() {
   git clone --quiet "https://github.com/$repo.git" "$tmp"
   pushd "$tmp" > /dev/null
   git checkout main
+
+  local before_merge
+  before_merge=$(git rev-parse HEAD)
   git merge origin/dev -m "prod: $name $(date +%Y-%m-%d_%H:%M)"
+
+  if [ "$(git rev-parse HEAD)" = "$before_merge" ]; then
+    echo "  $name — bez zmian na dev, pomijam"
+    popd > /dev/null
+    rm -rf "$tmp"
+    return
+  fi
 
   # Version bump bezposrednio w sklonowanym repo
   if [ -f package.json ]; then
