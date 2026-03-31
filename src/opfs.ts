@@ -20,9 +20,9 @@ export const writeCode = async (spec: string, data: string) => {
   const w = await fh.createWritable(); await w.write(data); await w.close()
 }
 
-export type PluginMeta = { specs: string[]; labels: Record<string, string>; licenseKey?: string; hashes: Record<string, string> }
+export type PluginMeta = { specs: string[]; labels: Record<string, string>; licenseKey?: string }
 
-let _m: PluginMeta = { specs: [], labels: {}, hashes: {} }
+let _m: PluginMeta = { specs: [], labels: {} }
 export const meta = () => _m
 
 export const loadMeta = async () => {

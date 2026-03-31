@@ -63,13 +63,6 @@ async function boot() {
       delete m.labels[spec]
       await saveMeta()
     },
-    resetTofu: async () => {
-      const m = meta()
-      const count = Object.keys(m.hashes).length
-      m.hashes = {}
-      await saveMeta()
-      return count
-    },
     uploadFile: async (parentId: string) => {
       const file = await openFileDialog('*')
       if (!file) return null

@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react'
-import { shouldCache, readCode, writeCode, meta, saveMeta } from './opfs'
+import { shouldCache, readCode, writeCode } from './opfs'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Store, PostRecord } from './store'
@@ -78,7 +78,6 @@ export interface SDK {
   getInstalledPlugins(): Promise<{ spec: string; label: string }[]>
   installPlugin(spec: string, label?: string): Promise<void>
   uninstallPlugin(spec: string): Promise<void>
-  resetTofu(): Promise<number>
 }
 
 // ── Contribution Point Types ─────────────────────────────────────────
@@ -220,15 +219,7 @@ const fetchModule = async (spec: string) => {
 export const loadOne = async (spec: string, deps: PluginDeps, expectedHash?: string) => {
   const t = performance.now()
   const { mod, hash, fromCache } = await fetchModule(spec)
-  if (expectedHash && expectedHash !== hash) throw new Error('integrity mismatch')
-  // TOFU — hashes w OPFS meta
-  const skipIntegrity = spec.startsWith('./') || spec.startsWith('store://')
-  if (!skipIntegrity) {
-    const m = meta()
-    const known = m.hashes[spec]
-    if (known && known !== hash) throw new Error(`Plugin "${spec}" został zmodyfikowany — kod pluginu zmienił się od ostatniego użycia. Wyczyść dane przeglądarki aby zaakceptować nową wersję.`)
-    if (!known) { m.hashes[spec] = hash; await saveMeta() }
-  }
+  if (expectedHash && expectedHash !== hash) throw new Error(`integrity mismatch dla "${spec}"`)
   if (typeof mod.default !== 'function') throw new Error('no default export')
   // Deferred SDK: captures registrations, binds pluginId after factory returns
   const deferred: { views: [string, Omit<ViewDef, 'pluginId'>][]; parsers: [string, Omit<ParserDef, 'pluginId'>][]; actions: [string, Omit<ActionDef, 'pluginId'>][] } = { views: [], parsers: [], actions: [] }
