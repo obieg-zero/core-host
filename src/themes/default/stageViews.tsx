@@ -168,7 +168,7 @@ export function GenericView({ node, cas, wf, ui, advanceToStage, getNextStage }:
     <ui.Page><ui.Stage><ui.StageLayout
       top={<ui.Stack gap="md">
         <ui.StepHeading step={stepNum} title={title} subtitle={node.data.description} />
-        {cl.length > 0 && cl.map((c: TaskDef, i: number) => <ui.CheckItem key={i} label={c.text} />)}
+        {cl.length > 0 && cl.map((c: TaskDef) => <ui.CheckItem key={c.text} label={c.text} />)}
       </ui.Stack>}
       bottom={nextId ? <ui.Button size="lg" color="primary" block onClick={() => advanceToStage(cas.id, nextId, wf)}>Dalej</ui.Button> : undefined}
     /></ui.Stage></ui.Page>

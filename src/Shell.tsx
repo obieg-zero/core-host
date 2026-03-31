@@ -24,7 +24,7 @@ export const Shell = () => {
 
   useEffect(() => {
     if (active && activeId !== active.id) setActiveId(active.id)
-  }, [activeId, routed.length])
+  }, [activeId, active?.id])
 
   return (
     <ShellLayout

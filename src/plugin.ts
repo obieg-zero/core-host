@@ -157,7 +157,7 @@ const STORE_BASE = 'https://obieg-zero-store.gotoreadyai.workers.dev'
 
 const makeShim = (global: string) =>
   'data:text/javascript,' + `const _=window.${global};export default _;` +
-  Object.keys((window as any)[global] ?? {}).filter(k => k !== 'default').map(k => `export const ${k}=_.${k};`).join('')
+  Object.keys((window as any)[global] ?? {}).filter(k => k !== 'default' && /^[$_a-zA-Z]/.test(k)).map(k => `export const ${k}=_.${k};`).join('')
 
 let JSX_SHIM: string, REACT_SHIM: string, REACT_DOM_SHIM: string
 const shims = () => { JSX_SHIM ??= makeShim('__jsx_runtime'); REACT_SHIM ??= makeShim('__react'); REACT_DOM_SHIM ??= makeShim('__react_dom') }
