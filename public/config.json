@@ -1,18 +1,15 @@
 [
   {
-    "importData": ["workflows.json", "opponents.json"],
-    "pluginUri": "./plugin-workflow-crm",
+    "pluginUri": "./plugin-brain-quest",
     "defaultOptions": {
-      "openai_api_key": "",
-      "openai_api_url": "https://api.openai.com/v1/chat/completions",
-      "openai_model": "gpt-4o-mini"
+      "bq:githubOrg": "BrainEduPlay"
     }
   },
   {
-    "pluginUri": "./plugin-wibor-calc"
+    "pluginUri": "./plugin-brain-quest-reader"
   },
   {
-    "pluginUri": "./plugin-data"
+    "pluginUri": "./plugin-brain-quest-arena"
   },
   {
     "pluginUri": "obieg-zero/plugin-darkmode@main",
