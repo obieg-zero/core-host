@@ -1,15 +1,15 @@
 [
   {
-    "pluginUri": "./plugin-brain-quest",
+    "pluginUri": "obieg-zero/plugin-brain-quest@dev",
     "defaultOptions": {
       "bq:githubOrg": "BrainEduPlay"
     }
   },
   {
-    "pluginUri": "./plugin-brain-quest-reader"
+    "pluginUri": "obieg-zero/plugin-brain-quest-reader@dev"
   },
   {
-    "pluginUri": "./plugin-brain-quest-arena"
+    "pluginUri": "obieg-zero/plugin-brain-quest-arena@dev"
   },
   {
     "pluginUri": "obieg-zero/plugin-darkmode@main",
