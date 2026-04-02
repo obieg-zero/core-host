@@ -1,5 +1,4 @@
 node_modules
 dist
-documents-dont-read
 .claude/settings.local.json
 .env

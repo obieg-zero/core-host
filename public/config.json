@@ -1,21 +1,23 @@
 [
   {
-    "pluginUri": "obieg-zero/plugin-darkmode@main",
+    "importData": ["workflows.json", "opponents.json"],
+    "pluginUri": "./plugin-workflow-crm",
     "defaultOptions": {
-      "theme": "dracula"
+      "openai_api_key": "",
+      "openai_api_url": "https://api.openai.com/v1/chat/completions",
+      "openai_model": "gpt-4o-mini"
     }
-  },
-  {
-    "pluginUri": "obieg-zero/plugin-data@main"
-  },
-  {
-    "pluginUri": "./plugin-manager"
   },
   {
     "pluginUri": "./plugin-wibor-calc"
   },
   {
-    "importData": ["workflows.json", "opponents.json"],
-    "pluginUri": "./plugin-workflow-crm"
+    "pluginUri": "./plugin-data"
+  },
+  {
+    "pluginUri": "obieg-zero/plugin-darkmode@main",
+    "defaultOptions": {
+      "theme": "dracula"
+    }
   }
 ]

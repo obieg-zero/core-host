@@ -1,14 +1,21 @@
 [
-  { "type": "workflow", "data": { "wfId": "wibor", "name": "Kredyt WIBOR", "stages": [
-    { "id": "dokument", "label": "1. Dokument", "color": "#3b82f6", "description": "Wgraj umowę kredytu i harmonogram", "view": "upload",
-      "checklist": [{ "text": "Umowa kredytu", "type": "upload" }, { "text": "Harmonogram spłat", "type": "upload" }, { "text": "Aneksy", "type": "upload" }],
+  { "type": "workflow", "data": { "wfId": "wibor-simple", "name": "WIBOR — uproszczony", "stages": [
+    { "id": "klient", "label": "1. Dane klienta", "color": "#3b82f6", "description": "Wprowadź dane klienta", "view": "form", "recordType": "client", "fields": [
+      { "key": "name", "label": "Imię i nazwisko", "required": true },
+      { "key": "phone", "label": "Telefon", "inputType": "tel" },
+      { "key": "email", "label": "Email", "inputType": "email" }
+    ] },
+    { "id": "kalkulacja", "label": "2. Kalkulator", "color": "#8b5cf6", "description": "Oblicz nadpłaty WIBOR", "view": "calc-redirect",
+      "targetPlugin": "plugin-wibor-calc"
+    },
+    { "id": "podsumowanie", "label": "3. Podsumowanie", "color": "#22c55e", "description": "Przegląd sprawy i raport PDF", "view": "summary-report" }
+  ], "branches": [] } },
+  { "type": "workflow", "data": { "wfId": "wibor-docs", "name": "WIBOR — dokumenty", "stages": [
+    { "id": "umowa", "label": "1. Umowa", "color": "#3b82f6", "description": "Wgraj umowę kredytu — AI wyciągnie dane klienta i kredytu", "view": "upload",
+      "checklist": [{ "text": "Umowa kredytu", "type": "upload" }],
       "pipeline": {
         "ocr": { "language": "pol" },
-        "classify": { "labels": ["umowa_kredytu", "harmonogram", "aneks", "regulamin"], "minScore": 0.3 },
-        "embed": [
-          { "group": "umowa", "docs": ["umowa_kredytu", "aneks", "regulamin"], "chunkSize": 512 },
-          { "group": "harmonogram", "docs": ["harmonogram"], "chunkSize": 256 }
-        ],
+        "embed": [{ "group": "umowa", "docs": ["*"], "chunkSize": 512 }],
         "extract": {
           "from": "umowa",
           "method": "api",
@@ -22,49 +29,28 @@
         }
       }
     },
-    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Sprawdź dane klienta", "view": "form", "recordType": "client", "fields": [
-      { "key": "name", "label": "Imię i nazwisko", "required": true },
-      { "key": "phone", "label": "Telefon", "inputType": "tel" },
-      { "key": "email", "label": "Email", "inputType": "email" }
-    ] },
-    { "id": "sprawa", "label": "3. Dane sprawy", "color": "#8b5cf6", "description": "Sprawdź dane kredytu", "view": "form", "recordType": "case",
-      "fields": [
-        { "key": "opponent", "label": "Bank", "required": true, "inputType": "select:opponent" },
-        { "key": "loanNumber", "label": "Nr umowy" },
-        { "key": "loanAmount", "label": "Kwota kredytu", "inputType": "number" },
-        { "key": "loanDate", "label": "Data umowy", "inputType": "date" }
-      ]
+    { "id": "zaswiadczenie", "label": "2. Zaświadczenie", "color": "#3b82f6", "description": "Wgraj zaświadczenie bankowe — OCR wyciągnie historię spłat", "view": "upload",
+      "checklist": [{ "text": "Zaświadczenie bankowe", "type": "upload" }],
+      "pipeline": {
+        "ocr": { "language": "pol" },
+        "parse": {
+          "type": "payment-history",
+          "section": "Historia spłat",
+          "columns": [
+            { "key": "date", "label": "Data" },
+            { "key": "description", "label": "Opis" },
+            { "key": "amount", "label": "Kwota" },
+            { "key": "principal", "label": "Kapitał" },
+            { "key": "interest", "label": "Odsetki" },
+            { "key": "penaltyInterest", "label": "Odsetki karne" },
+            { "key": "fees", "label": "Opłaty" },
+            { "key": "overpayment", "label": "Nadpłata" }
+          ]
+        }
+      }
     },
-    { "id": "analiza", "label": "4. Analiza umowy", "color": "#8b5cf6", "description": "Klauzule abuzywne, ocena", "view": "upload", "checklist": [{ "text": "Wyciąg danych", "type": "extract" }, { "text": "Klauzule", "type": "extract" }] },
-    { "id": "dec-viable", "label": "Czy sprawa ma szansę?", "color": "#f59e0b" },
-    { "id": "kalkulacja", "label": "5. Kalkulacja", "color": "#8b5cf6", "description": "Nadpłaty WIBOR", "checklist": [{ "text": "Harmonogram", "type": "upload" }, { "text": "Kalkulacja", "type": "extract" }, { "text": "Wartość sporu", "type": "generate" }] },
-    { "id": "dokumenty", "label": "6. Dokumenty", "description": "Kompletowanie akt", "view": "upload", "checklist": [{ "text": "Saldo", "type": "upload" }, { "text": "Wpłaty", "type": "upload" }, { "text": "Pełnomocnictwo", "type": "generate" }] },
-    { "id": "reklamacja", "label": "7. Reklamacja", "color": "#f59e0b", "description": "Reklamacja przedsądowa", "checklist": [{ "text": "Reklamacja", "type": "generate" }, { "text": "Wysłanie", "type": "manual" }, { "text": "Potwierdzenie", "type": "upload" }, { "text": "Odpowiedź", "type": "manual" }] },
-    { "id": "dec-bank", "label": "Bank uznał reklamację?", "color": "#f59e0b" },
-    { "id": "pozew", "label": "8. Pozew", "color": "#ef4444", "description": "Przygotowanie i złożenie", "checklist": [{ "text": "Pozew", "type": "generate" }, { "text": "Żądania", "type": "manual" }, { "text": "Opłata", "type": "manual" }, { "text": "Złożenie", "type": "upload" }] },
-    { "id": "postepowanie", "label": "9. Postępowanie", "color": "#f59e0b", "description": "Korespondencja, rozprawy", "view": "timeline", "checklist": [{ "text": "Sprzeciw", "type": "generate" }, { "text": "Pisma", "type": "generate" }, { "text": "Rozprawy", "type": "manual" }, { "text": "Dowody", "type": "generate" }] },
-    { "id": "dec-wyrok", "label": "Wyrok korzystny?", "color": "#f59e0b" },
-    { "id": "apelacja", "label": "10. Apelacja", "color": "#ef4444", "checklist": [{ "text": "Analiza", "type": "extract" }, { "text": "Apelacja", "type": "generate" }, { "text": "Złożenie", "type": "manual" }] },
-    { "id": "egzekucja", "label": "11. Egzekucja", "color": "#22c55e", "checklist": [{ "text": "Klauzula", "type": "upload" }, { "text": "Wezwanie", "type": "generate" }, { "text": "Egzekucja", "type": "generate" }] },
-    { "id": "rozliczenie", "label": "12. Rozliczenie", "color": "#22c55e", "checklist": [{ "text": "Faktura", "type": "generate" }, { "text": "Success fee", "type": "manual" }, { "text": "Zamknięcie", "type": "manual" }] }
-  ], "branches": [
-    { "from": "dec-viable", "to": "kalkulacja", "handle": "yes", "label": "Tak" },
-    { "from": "dec-viable", "to": "rozliczenie", "handle": "no", "label": "Odrzuć" },
-    { "from": "dec-bank", "to": "pozew", "handle": "yes", "label": "Nie" },
-    { "from": "dec-bank", "to": "rozliczenie", "handle": "no", "label": "Ugoda" },
-    { "from": "dec-wyrok", "to": "apelacja", "handle": "yes", "label": "Nie" },
-    { "from": "dec-wyrok", "to": "egzekucja", "handle": "no", "label": "Tak" },
-    { "from": "apelacja", "to": "postepowanie" }
-  ] } },
-  { "type": "workflow", "data": { "wfId": "wibor-simple", "name": "WIBOR uproszczony", "stages": [
-    { "id": "klient", "label": "1. Dane klienta", "color": "#3b82f6", "description": "Wprowadź dane klienta", "view": "form", "recordType": "client", "fields": [
-      { "key": "name", "label": "Imię i nazwisko", "required": true },
-      { "key": "phone", "label": "Telefon", "inputType": "tel" },
-      { "key": "email", "label": "Email", "inputType": "email" }
-    ] },
-    { "id": "kalkulacja", "label": "2. Kalkulator", "color": "#8b5cf6", "description": "Oblicz nadpłaty WIBOR", "view": "calc-redirect",
+    { "id": "kalkulacja", "label": "3. Kalkulacja", "color": "#8b5cf6", "description": "Oblicz nadpłaty WIBOR na podstawie historii spłat", "view": "calc-redirect",
       "targetPlugin": "plugin-wibor-calc"
-    },
-    { "id": "podsumowanie", "label": "3. Podsumowanie", "color": "#22c55e", "description": "Przegląd sprawy i raport PDF", "view": "summary-report" }
+    }
   ], "branches": [] } }
 ]

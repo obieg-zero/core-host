@@ -9,7 +9,7 @@ Platforma pluginowa w przeglądarce. Zustand + IndexedDB (dane), OPFS (pluginy),
 - Przed zmianą pluginu: config na local → praca → build → user potwierdza → push → config na GitHub
 - Sprawdź czy WSZYSTKIE typy z seed data mają `store.registerType()`
 - Operacje na repozytoriach GitHub (tworzenie, usuwanie) wykonuj przez `gh` CLI
-- **NIGDY** ręcznie `git add/commit/push` ani `npm publish` — TYLKO skrypty z `scripts/`
+- **NIGDY** ręcznie `git add/commit/push` ani `npm publish` — TYLKO przez MCP `obieg-deploy`
 
 ## Store — synchroniczny CRUD (IndexedDB)
 
@@ -85,7 +85,7 @@ src/
 
 ## NPM packages (w pluginach `../plugins/node_modules/`)
 
-- `@obieg-zero/sdk` — typy + UI komponenty. Każdy plugin importuje `type { PluginFactory }` stąd. Źródło: `../packages/sdk/`, publish: `scripts/deploy-package-to-npm.sh sdk`.
+- `@obieg-zero/sdk` — typy + UI komponenty. Każdy plugin importuje `type { PluginFactory }` stąd. Źródło: `../packages/sdk/`, publish: MCP `package_publish`.
 - `@obieg-zero/workflow-engine` — graph nodes, buildWorkflow. Stage views w `src/themes/default/stageViews.tsx`.
 - `@obieg-zero/doc-pipeline` — OCR + AI extraction pipeline.
 - `@obieg-zero/doc-reader` — PDF text + Tesseract OCR.
@@ -93,19 +93,30 @@ src/
 
 Czytaj README każdego package'u przed użyciem.
 
-## Deploy — TYLKO przez skrypty
+## Deploy — TYLKO przez MCP `obieg-deploy`
+
+MCP server: `../packages/mcp-deploy/` — 14 narzędzi:
 
 ```
-scripts/push-core-host.sh [msg]                    — commit + push CORE-HOST
-scripts/deploy-plugin-to-dev.sh [name]             — build + push plugin na @dev
-scripts/deploy-plugin-from-dev-to-prod.sh [name]   — promote @dev → @main + tag
-scripts/deploy-app-to-dev.sh                       — build + deploy app na dev
-scripts/deploy-app-from-dev-to-prod.sh             — build + deploy app na prod
-scripts/deploy-package-to-npm.sh [name]            — publish package na npm
+plugin_status          — porównanie local vs GitHub
+plugin_config_local    — config → ./plugin-X (tryb lokalny)
+plugin_config_github   — config → @main lub @dev
+plugin_build           — build wszystkich pluginów
+plugin_deploy_dev      — build + push na @dev + config → @dev
+plugin_deploy_prod     — promote dev → main + tag + config → @main
+package_status         — wersje paczek NPM
+package_publish        — publish paczki na npm
+app_deploy_dev         — build + deploy app na dev
+app_deploy_prod        — build + deploy app na prod
+app_status             — wersje app (local/dev/prod)
+check_sync             — pełny audyt
+push_core_host         — commit + push CORE-HOST
+setup_creem            — sync pluginów z Creem
 ```
 
 ## Cykl pracy z pluginem
 
-1. `public/config.json`: zamień `"obieg-zero/plugin-X@main"` → `"./plugin-X"`
-2. Edytuj, builduj: `cd ../plugins && npm run build`
-3. User potwierdza → `scripts/deploy-plugin-to-dev.sh plugin-X` → przywróć config na GitHub
+1. `plugin_config_local` → config na `./plugin-X`
+2. Edytuj źródła, `plugin_build` po każdej zmianie
+3. User potwierdza → `plugin_deploy_dev` (push + config → @dev)
+4. User potwierdza → `plugin_deploy_prod` (dev → main + tag + config → @main)
