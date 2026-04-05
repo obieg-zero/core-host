@@ -236,5 +236,5 @@ export const loadOne = async (spec: string, deps: PluginDeps, expectedHash?: str
   for (const [id, a] of deferred.actions) registerAction(id, { ...a, pluginId: def.id })
   registerPlugin(def)
   const src = fromCache ? 'OPFS' : 'sieć'
-  log(`Plugin "${def.label}" zaladowany z ${src} (${Math.round(performance.now() - t)}ms)`, 'ok')
+  log(`Plugin "${def.label}" v${def.version || '?'} zaladowany z ${src} (${Math.round(performance.now() - t)}ms)`, 'ok')
 }

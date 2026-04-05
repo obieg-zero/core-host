@@ -1,20 +1,14 @@
 [
   {
-    "pluginUri": "obieg-zero/plugin-brain-quest@dev",
-    "defaultOptions": {
-      "bq:githubOrg": "BrainEduPlay"
-    }
+    "pluginUri": "obieg-zero/plugin-brain-quest@main"
   },
   {
-    "pluginUri": "obieg-zero/plugin-brain-quest-reader@dev"
+    "pluginUri": "obieg-zero/plugin-brain-quest-reader@main"
   },
   {
-    "pluginUri": "obieg-zero/plugin-brain-quest-arena@dev"
+    "pluginUri": "obieg-zero/plugin-brain-quest-arena@main"
   },
   {
-    "pluginUri": "obieg-zero/plugin-darkmode@main",
-    "defaultOptions": {
-      "theme": "dracula"
-    }
+    "pluginUri": "./plugin-data"
   }
 ]

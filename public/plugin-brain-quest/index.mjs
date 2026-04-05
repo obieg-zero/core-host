@@ -1,15 +1,14 @@
-import { jsx, jsxs } from "react/jsx-runtime";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 const GH_API = "https://api.github.com";
 const GH_RAW = "https://raw.githubusercontent.com";
 const plugin = ({ React, ui, store, sdk, icons }) => {
   const { useState, useMemo, useCallback, useRef, useEffect } = React;
-  const { Award, Star, Check } = icons;
+  const { Award, Star, Check, X, Zap } = icons;
   store.registerType("tree", [
     { key: "title", label: "Tytuł", required: true },
     { key: "branches", label: "Gałęzie" },
     { key: "edges", label: "Krawędzie" },
-    { key: "source", label: "Źródło" },
-    { key: "files", label: "Pliki" }
+    { key: "repo", label: "Repo" }
   ], "Drzewa wiedzy");
   store.registerType("node", [
     { key: "nodeId", label: "ID", required: true },
@@ -25,26 +24,42 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
   ], "Treści");
   store.registerType("lexicon", [
     { key: "term", label: "Termin", required: true },
-    { key: "forms", label: "Formy" },
+    { key: "nodes", label: "Węzły", required: true },
     { key: "definition", label: "Definicja", required: true },
-    { key: "example", label: "Przykład" },
+    { key: "quiz", label: "Quiz" },
+    { key: "forms", label: "Formy" },
     { key: "category", label: "Kategoria" }
   ], "Leksykon");
-  store.registerType("context", [
-    { key: "ctxType", label: "Typ", required: true },
-    { key: "title", label: "Tytuł", required: true },
-    { key: "lexiconIds", label: "Terminy" },
-    { key: "contextData", label: "Dane" }
-  ], "Konteksty");
   store.registerType("discovery", [
     { key: "termId", label: "Termin", required: true },
     { key: "hits", label: "Odkrycia" },
     { key: "firstSeen", label: "Pierwsze" },
     { key: "lastSeen", label: "Ostatnie" }
   ], "Odkrycia");
+  const edgeStr = (disc) => {
+    const hits = Number(disc.data.hits) || 0;
+    const lastSeen = Number(disc.data.lastSeen) || Date.now();
+    const days = (Date.now() - lastSeen) / 864e5;
+    return Math.min(hits / 5, 1) * Math.exp(-0.1 * days);
+  };
+  const discover = (termId) => {
+    const all = store.getPosts("discovery");
+    const existing = all.find((d) => d.data.termId === termId);
+    const now = Date.now();
+    if (existing) {
+      store.update(existing.id, { hits: (Number(existing.data.hits) || 0) + 1, lastSeen: now });
+    } else {
+      store.add("discovery", { termId, hits: 1, firstSeen: now, lastSeen: now });
+    }
+  };
+  const unlockNode = (postId) => {
+    const n = store.get(postId);
+    if (n) store.update(postId, { hits: (Number(n.data.hits) || 0) + 1 });
+  };
   const useNav = sdk.create(() => ({
     treeId: null,
-    sel: null
+    sel: null,
+    phase: "map"
   }));
   const str = (n) => Math.min((Number(n.data.hits) || 0) / 5, 1);
   const jparse = (s, fb) => {
@@ -54,62 +69,27 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       return fb;
     }
   };
-  const importPack = (text, source) => {
-    const d = JSON.parse(text);
-    if (d.nodes && d.edges) {
-      const count = store.importJSON([{
-        type: "tree",
-        data: {
-          title: d.title || d.id,
-          branches: JSON.stringify(d.branches || {}),
-          edges: JSON.stringify(d.edges),
-          source: source || "",
-          files: JSON.stringify(d.files || {})
-        },
-        children: d.nodes.map((n) => ({ type: "node", data: { nodeId: n.id, title: n.title, branch: n.branch || "", tier: n.tier ?? 0, hits: 0 } }))
-      }]);
-      sdk.log(`Drzewo "${d.title}" — ${count} rekordów`, "ok");
-    }
-    if (d.content) {
-      const all = store.getPosts("node");
-      let c = 0;
-      for (const [nid, items] of Object.entries(d.content)) {
-        const node = all.find((n) => n.data.nodeId === nid);
-        if (!node) continue;
-        for (const it of items) {
-          store.add("content", { contentType: it.type, text: it.text, answer: it.answer || "" }, { parentId: node.id });
-          c++;
-        }
-      }
-      sdk.log(`Kontent "${d.title}" — ${c} elementów`, "ok");
-    }
-  };
-  const fetchedFiles = /* @__PURE__ */ new Set();
-  const fetchContentForNode = async (nodeId, treeId) => {
-    const tree = store.get(treeId);
-    if (!tree) return;
-    const source = String(tree.data.source || "");
-    if (!source) return;
-    const filesMap = jparse(String(tree.data.files || "{}"), {});
-    for (const [file, nodeIds] of Object.entries(filesMap)) {
-      if (!nodeIds.includes(nodeId)) continue;
-      const key = `${source}/${file}`;
-      if (fetchedFiles.has(key)) continue;
-      fetchedFiles.add(key);
-      try {
-        const r = await fetch(`${GH_RAW}/${source}/main/${file}`);
-        if (!r.ok) throw new Error(`${r.status}`);
-        importPack(await r.text());
-        sdk.log(`Pobrano: ${file}`, "ok");
-      } catch (e) {
-        sdk.log(`Błąd pobierania ${file}: ${e}`, "error");
-      }
-    }
-  };
   function SkillTree() {
-    const { treeId, sel } = useNav();
+    const { treeId, sel, phase } = useNav();
     const tree = store.usePost(treeId || "");
     const nodes = store.useChildren(treeId || "", "node");
+    const flash = sdk.shared((s) => s == null ? void 0 : s.bqFlash);
+    const [discoveredPairs, setDiscoveredPairs] = useState([]);
+    useEffect(() => {
+      if (!flash) return;
+      const fromNode = nodes.find((n) => String(n.data.title) === flash.from);
+      const toNode = nodes.find((n) => String(n.data.title) === flash.to);
+      if (fromNode && toNode) {
+        const fromNid = String(fromNode.data.nodeId);
+        const toNid = String(toNode.data.nodeId);
+        setDiscoveredPairs((prev) => {
+          if (prev.some((p) => p.fromNid === fromNid && p.toNid === toNid || p.fromNid === toNid && p.toNid === fromNid))
+            return prev.map((p) => p.fromNid === fromNid && p.toNid === toNid || p.fromNid === toNid && p.toNid === fromNid ? { ...p, fresh: true } : p);
+          return [...prev.map((p) => ({ ...p, fresh: false })), { fromNid, toNid, fresh: true }];
+        });
+        sdk.shared.setState({ bqFlash: null });
+      }
+    }, [flash]);
     const edges = useMemo(() => tree ? jparse(String(tree.data.edges || "[]"), []) : [], [tree]);
     const branches = useMemo(() => tree ? jparse(String(tree.data.branches || "{}"), {}) : {}, [tree]);
     const adj = useMemo(() => {
@@ -182,6 +162,28 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       }
       return pos;
     }, [rootNid, adj]);
+    const discoveries = store.usePosts("discovery");
+    const terms = store.useChildren(treeId || "", "lexicon");
+    const contextEdges = useMemo(() => {
+      const discoveredTermIds = new Set(discoveries.map((d) => String(d.data.termId)));
+      if (!discoveredTermIds.size) return [];
+      const pairs = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const term of terms) {
+        if (!discoveredTermIds.has(term.id)) continue;
+        const termNodes = jparse(String(term.data.nodes || "[]"), []);
+        if (termNodes.length < 2) continue;
+        for (let i = 0; i < termNodes.length; i++)
+          for (let j = i + 1; j < termNodes.length; j++) {
+            if (!visible.has(termNodes[i]) || !visible.has(termNodes[j])) continue;
+            const key = [termNodes[i], termNodes[j]].sort().join(":");
+            if (seen.has(key)) continue;
+            seen.add(key);
+            pairs.push({ from: termNodes[i], to: termNodes[j], strength: 0.6 });
+          }
+      }
+      return pairs;
+    }, [discoveries, terms, visible]);
     const focusNid = sel ? (() => {
       const n = store.get(sel);
       return n ? String(n.data.nodeId) : rootNid;
@@ -220,126 +222,219 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       };
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
-    }, []);
+    }, [viewR]);
     if (!treeId) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Wybierz drzewo z listy" });
     if (!nodes.length) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Zaimportuj paczkę bazową" });
     const visNodes = nodes.filter((n) => visible.has(String(n.data.nodeId)));
     const visEdges = edges.filter((e) => visible.has(e.from) && visible.has(e.to));
-    return /* @__PURE__ */ jsxs(ui.Stack, { children: [
-      /* @__PURE__ */ jsxs(
-        "svg",
-        {
-          ref: svgRef,
-          viewBox: vb,
-          style: { width: "100%", maxHeight: "75vh", cursor: "grab", userSelect: "none" },
-          onMouseDown: onDown,
-          children: [
-            visEdges.map((e, i) => {
-              const f = layout.get(e.from), t = layout.get(e.to);
-              return f && t ? /* @__PURE__ */ jsx("line", { x1: f.x, y1: f.y, x2: t.x, y2: t.y, stroke: "#475569", strokeWidth: 1.5, opacity: 0.3 }, i) : null;
-            }),
-            visNodes.map((n) => {
-              var _a;
-              const nid = String(n.data.nodeId), p = layout.get(nid);
-              if (!p) return null;
-              const s = str(n), disc = discovered.has(nid), front = frontier.has(nid), mast = s >= 1;
-              const r = mast ? 26 : disc ? 22 : 16;
-              const bc = ((_a = branches[String(n.data.branch)]) == null ? void 0 : _a.color) || "#64748b";
-              const fill = mast ? bc : disc ? bc + "80" : "#1e293b";
-              return /* @__PURE__ */ jsxs("g", { onClick: () => {
-                useNav.setState({ sel: n.id });
-                sdk.shared.setState({ bq: { treeId, nodeId: nid, postId: n.id } });
-                if (!disc) {
-                  fetchContentForNode(nid, treeId);
-                  sdk.shared.setState({ bq: { treeId, nodeId: nid, postId: n.id, challenge: true } });
-                  sdk.useHostStore.setState({ activeId: "plugin-brain-quest-arena" });
+    return /* @__PURE__ */ jsxs(
+      "svg",
+      {
+        ref: svgRef,
+        viewBox: vb,
+        style: { width: "100%", height: "100%", cursor: "grab", userSelect: "none", display: "block" },
+        onMouseDown: onDown,
+        children: [
+          /* @__PURE__ */ jsxs("defs", { children: [
+            /* @__PURE__ */ jsxs("filter", { id: "glow", children: [
+              /* @__PURE__ */ jsx("feGaussianBlur", { stdDeviation: "3", result: "blur" }),
+              /* @__PURE__ */ jsxs("feMerge", { children: [
+                /* @__PURE__ */ jsx("feMergeNode", { in: "blur" }),
+                /* @__PURE__ */ jsx("feMergeNode", { in: "SourceGraphic" })
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxs("filter", { id: "flashGlow", children: [
+              /* @__PURE__ */ jsx("feGaussianBlur", { stdDeviation: "6", result: "blur" }),
+              /* @__PURE__ */ jsxs("feMerge", { children: [
+                /* @__PURE__ */ jsx("feMergeNode", { in: "blur" }),
+                /* @__PURE__ */ jsx("feMergeNode", { in: "blur" }),
+                /* @__PURE__ */ jsx("feMergeNode", { in: "SourceGraphic" })
+              ] })
+            ] })
+          ] }),
+          discoveredPairs.map((pair, i) => {
+            const f = layout.get(pair.fromNid), t = layout.get(pair.toNid);
+            if (!f || !t) return null;
+            return /* @__PURE__ */ jsxs("g", { children: [
+              /* @__PURE__ */ jsx(
+                "line",
+                {
+                  x1: f.x,
+                  y1: f.y,
+                  x2: t.x,
+                  y2: t.y,
+                  stroke: "#f59e0b",
+                  strokeWidth: pair.fresh ? 4 : 3,
+                  opacity: pair.fresh ? 0.8 : 0.5,
+                  filter: "url(#glow)",
+                  children: pair.fresh && /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "1;0.4;1;0.8", dur: "1s", repeatCount: "3", fill: "freeze" })
                 }
-              }, style: { cursor: "pointer" }, children: [
-                focusNid === nid && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 8, fill: "none", stroke: "#fff", strokeWidth: 1, opacity: 0.3 }),
-                sel === n.id && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 5, fill: "none", stroke: "#fff", strokeWidth: 2 }),
-                /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r, fill, stroke: mast ? "#fff" : front ? bc + "40" : bc, strokeWidth: 1.5 }),
-                front && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 3, fill: "none", stroke: bc, strokeWidth: 1, strokeDasharray: "4 3", opacity: 0.5 }),
-                /* @__PURE__ */ jsx("text", { x: p.x, y: p.y + 5, textAnchor: "middle", fill: disc ? "#fff" : "#64748b", fontSize: mast ? 14 : 10, children: mast ? "★" : disc ? Number(n.data.hits) : "?" }),
-                /* @__PURE__ */ jsx("text", { x: p.x, y: p.y + r + 14, textAnchor: "middle", fill: disc ? "#e2e8f0" : "#475569", fontSize: 10, children: disc ? String(n.data.title).slice(0, 16) : "???" })
-              ] }, n.id);
-            })
-          ]
-        }
-      ),
-      sel && /* @__PURE__ */ jsx(NodeDetail, { id: sel })
-    ] });
+              ),
+              pair.fresh && /* @__PURE__ */ jsxs(Fragment, { children: [
+                /* @__PURE__ */ jsxs("circle", { cx: f.x, cy: f.y, r: 28, fill: "none", stroke: "#f59e0b", strokeWidth: 2, children: [
+                  /* @__PURE__ */ jsx("animate", { attributeName: "r", values: "25;35;28", dur: "1s", repeatCount: "3", fill: "freeze" }),
+                  /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "0.8;0.3;0.4", dur: "1s", repeatCount: "3", fill: "freeze" })
+                ] }),
+                /* @__PURE__ */ jsxs("circle", { cx: t.x, cy: t.y, r: 28, fill: "none", stroke: "#f59e0b", strokeWidth: 2, children: [
+                  /* @__PURE__ */ jsx("animate", { attributeName: "r", values: "25;35;28", dur: "1s", repeatCount: "3", fill: "freeze" }),
+                  /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "0.8;0.3;0.4", dur: "1s", repeatCount: "3", fill: "freeze" })
+                ] })
+              ] })
+            ] }, `dp-${i}`);
+          }),
+          contextEdges.map((ce, i) => {
+            const f = layout.get(ce.from), t = layout.get(ce.to);
+            return f && t ? /* @__PURE__ */ jsx(
+              "line",
+              {
+                x1: f.x,
+                y1: f.y,
+                x2: t.x,
+                y2: t.y,
+                stroke: "#f59e0b",
+                strokeWidth: 2,
+                opacity: ce.strength * 0.6,
+                filter: "url(#glow)"
+              },
+              `ctx-${i}`
+            ) : null;
+          }),
+          visEdges.map((e, i) => {
+            const f = layout.get(e.from), t = layout.get(e.to);
+            return f && t ? /* @__PURE__ */ jsx("line", { x1: f.x, y1: f.y, x2: t.x, y2: t.y, stroke: "#475569", strokeWidth: 1.5, opacity: 0.3 }, i) : null;
+          }),
+          visNodes.map((n) => {
+            var _a;
+            const nid = String(n.data.nodeId), p = layout.get(nid);
+            if (!p) return null;
+            const s = str(n), disc = discovered.has(nid), front = frontier.has(nid), mast = s >= 1;
+            const r = mast ? 26 : disc ? 22 : 16;
+            const bc = ((_a = branches[String(n.data.branch)]) == null ? void 0 : _a.color) || "#64748b";
+            const fill = mast ? bc : disc ? bc + "80" : "#1e293b";
+            return /* @__PURE__ */ jsxs("g", { onClick: () => {
+              useNav.setState({ sel: n.id, phase: "detail" });
+              sdk.shared.setState({ bq: { treeId, nodeId: nid, postId: n.id } });
+            }, style: { cursor: "pointer" }, children: [
+              focusNid === nid && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 8, fill: "none", stroke: "#fff", strokeWidth: 1, opacity: 0.3 }),
+              sel === n.id && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 5, fill: "none", stroke: "#fff", strokeWidth: 2 }),
+              /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r, fill, stroke: mast ? "#fff" : front ? bc + "40" : bc, strokeWidth: 1.5 }),
+              front && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 3, fill: "none", stroke: bc, strokeWidth: 1, strokeDasharray: "4 3", opacity: 0.5 }),
+              /* @__PURE__ */ jsx("text", { x: p.x, y: p.y + 5, textAnchor: "middle", fill: disc ? "#fff" : "#64748b", fontSize: mast ? 14 : 10, children: mast ? "★" : disc ? Number(n.data.hits) : "?" }),
+              /* @__PURE__ */ jsx("text", { x: p.x, y: p.y + r + 14, textAnchor: "middle", fill: disc ? "#e2e8f0" : "#475569", fontSize: 10, children: disc ? String(n.data.title).slice(0, 16) : "???" })
+            ] }, n.id);
+          })
+        ]
+      }
+    );
   }
   function NodeDetail({ id }) {
     const node = store.usePost(id);
-    const contents = store.useChildren(id, "content");
     if (!node) return null;
     const s = str(node);
+    const contents = store.useChildren(id, "content");
+    const hasContent = contents.some((c) => String(c.data.contentType) !== "quiz");
+    const slideCount = contents.filter((c) => String(c.data.contentType) !== "quiz").length;
     return /* @__PURE__ */ jsx(ui.Card, { children: /* @__PURE__ */ jsxs(ui.Stack, { children: [
       /* @__PURE__ */ jsxs(ui.Row, { justify: "between", children: [
-        /* @__PURE__ */ jsx(ui.Text, { bold: true, children: String(node.data.title) }),
-        /* @__PURE__ */ jsx(ui.Badge, { children: s >= 1 ? "★ Opanowane" : s > 0 ? "Odkryte" : "Nieznane" })
+        /* @__PURE__ */ jsx(ui.Heading, { title: String(node.data.title) }),
+        /* @__PURE__ */ jsxs(ui.Row, { gap: "sm", children: [
+          /* @__PURE__ */ jsx(ui.Badge, { children: s >= 1 ? "★ Opanowane" : s > 0 ? "Odkryte" : "Nieznane" }),
+          /* @__PURE__ */ jsx(ui.Button, { size: "xs", color: "ghost", onClick: () => useNav.setState({ phase: "map", sel: null }), children: /* @__PURE__ */ jsx(X, { size: 14 }) })
+        ] })
       ] }),
-      contents.map((c) => /* @__PURE__ */ jsx(ui.Text, { size: "sm", muted: true, children: String(c.data.text) }, c.id)),
-      !contents.length && /* @__PURE__ */ jsx(ui.Text, { muted: true, size: "xs", children: "Brak treści" }),
-      /* @__PURE__ */ jsxs(ui.Row, { gap: "sm", children: [
-        /* @__PURE__ */ jsx(ui.Button, { size: "xs", color: "primary", onClick: () => {
-          sdk.shared.setState({ bq: { treeId: useNav.getState().treeId, nodeId: String(node.data.nodeId), postId: id, challenge: true } });
+      hasContent && /* @__PURE__ */ jsxs(ui.Text, { muted: true, size: "sm", children: [
+        slideCount,
+        " slajdów do przeczytania"
+      ] }),
+      /* @__PURE__ */ jsxs(ui.Stack, { children: [
+        /* @__PURE__ */ jsx(ui.Button, { size: "lg", color: "primary", block: true, onClick: () => {
+          const treeId = useNav.getState().treeId;
+          sdk.shared.setState({ bq: { treeId, nodeId: String(node.data.nodeId), postId: id } });
+          sdk.useHostStore.setState({ activeId: "plugin-brain-quest-reader" });
+        }, children: "Czytaj i odkrywaj" }),
+        /* @__PURE__ */ jsxs(ui.Button, { size: "lg", color: "primary", outline: true, block: true, onClick: () => {
+          const treeId = useNav.getState().treeId;
+          sdk.shared.setState({ bq: { treeId, nodeId: String(node.data.nodeId), postId: id, challenge: true } });
           sdk.useHostStore.setState({ activeId: "plugin-brain-quest-arena" });
-        }, children: "Trenuj w Arenie" }),
-        /* @__PURE__ */ jsx(ui.Button, { size: "xs", outline: true, onClick: () => sdk.useHostStore.setState({ activeId: "plugin-brain-quest-reader" }), children: "Czytaj" })
+        }, children: [
+          /* @__PURE__ */ jsx(Zap, { size: 14 }),
+          " Arena"
+        ] })
       ] })
     ] }) });
   }
   const DEFAULT_ORG = "BrainEduPlay";
-  const fetchLexicon = async (source, treeId) => {
-    for (const file of ["lexicon.json", "knowledge.json"]) {
+  const loadLexicon = async (base, tree) => {
+    const nodes = store.getPosts("node").filter((n) => n.parentId === tree.id);
+    const fetches = nodes.map(async (n) => {
       try {
-        const r = await fetch(`${GH_RAW}/${source}/main/${file}`);
-        if (!r.ok) continue;
-        const packs = JSON.parse(await r.text());
-        let totalLex = 0;
-        for (const pack of Array.isArray(packs) ? packs : [packs]) {
-          const categories = /* @__PURE__ */ new Map();
-          for (const lex of pack.lexicon || []) {
-            const rec = store.add("lexicon", {
-              term: lex.term,
-              forms: JSON.stringify(lex.forms || []),
-              definition: lex.definition,
-              example: lex.example || "",
-              category: lex.category || ""
-            }, { parentId: treeId });
-            const cat = lex.category || "inne";
-            if (!categories.has(cat)) categories.set(cat, []);
-            categories.get(cat).push(rec.id);
-            totalLex++;
-          }
-          for (const [cat, ids] of categories) {
-            store.add("context", {
-              ctxType: cat,
-              title: cat.charAt(0).toUpperCase() + cat.slice(1),
-              lexiconIds: JSON.stringify(ids),
-              contextData: "{}"
-            }, { parentId: treeId });
-          }
+        const r = await fetch(`${base}/lexicon/${n.data.nodeId}.json`);
+        if (!r.ok) return 0;
+        const entries = JSON.parse(await r.text());
+        let count = 0;
+        const existing = store.getPosts("lexicon").filter((x) => x.parentId === tree.id);
+        for (const l of entries) {
+          if (existing.some((x) => String(x.data.term) === String(l.data.term))) continue;
+          store.add(l.type, l.data, { parentId: tree.id });
+          count++;
         }
-        if (totalLex) sdk.log(`Leksykon: ${totalLex} terminów`, "ok");
-        return;
+        return count;
       } catch {
+        return 0;
       }
-    }
+    });
+    const counts = await Promise.all(fetches);
+    return counts.reduce((a, b) => a + b, 0);
   };
   const loadTree = async (org, repo) => {
+    var _a, _b;
     try {
-      const r = await fetch(`${GH_RAW}/${org}/${repo}/main/index.json`);
-      if (!r.ok) throw new Error(`GitHub: ${r.status}`);
-      importPack(await r.text(), `${org}/${repo}`);
+      const base = `${GH_RAW}/${org}/${repo}/main`;
+      const treeRes = await fetch(`${base}/tree.json`);
+      if (!treeRes.ok) throw new Error(`tree.json: ${treeRes.status}`);
+      const treeSeeds = JSON.parse(await treeRes.text());
+      const treeTitleFromSeed = ((_b = (_a = treeSeeds[0]) == null ? void 0 : _a.data) == null ? void 0 : _b.title) || "";
+      const treeCount = store.importJSON(treeSeeds);
       const trees = store.getPosts("tree");
-      const tree = trees.find((t) => t.data.source === `${org}/${repo}`);
-      if (tree) fetchLexicon(`${org}/${repo}`, tree.id);
+      const tree = trees.find((t) => String(t.data.title) === treeTitleFromSeed);
+      if (tree) {
+        const lexCount = await loadLexicon(base, tree);
+        sdk.log(`${repo} — ${treeCount + lexCount} rekordów`, "ok");
+        store.update(tree.id, { repo: `${org}/${repo}` });
+      }
     } catch (e) {
       sdk.log(String(e), "error");
     }
   };
+  const loadLexiconFromRepo = async (treeId, org, repo) => {
+    const tree = store.get(treeId);
+    if (!tree) return;
+    const base = `${GH_RAW}/${org}/${repo}/main`;
+    const count = await loadLexicon(base, tree);
+    sdk.log(`${repo} — ${count} nowych terminów`, "ok");
+  };
+  const loadNodeContent = async (treeId, nodeId) => {
+    const tree = store.get(treeId);
+    if (!tree) return;
+    const repo = String(tree.data.repo || "");
+    if (!repo) return;
+    const nodes = store.getPosts("node").filter((n) => n.parentId === treeId);
+    const node = nodes.find((n) => String(n.data.nodeId) === nodeId);
+    if (!node) return;
+    const existing = store.getPosts("content").filter((c) => c.parentId === node.id);
+    if (existing.length > 0) return;
+    try {
+      const r = await fetch(`${GH_RAW}/${repo}/main/content/${nodeId}.json`);
+      if (!r.ok) return;
+      const entries = JSON.parse(await r.text());
+      for (const e of entries) {
+        store.add(e.type, e.data, { parentId: node.id });
+      }
+    } catch (e) {
+      sdk.log(`Content ${nodeId}: ${e}`, "error");
+    }
+  };
+  sdk.shared.setState({ bqHelpers: { discover, unlockNode, edgeStr, loadNodeContent, loadLexiconFromRepo } });
   function RepoPicker() {
     const org = store.useOption("bq:githubOrg") || DEFAULT_ORG;
     const [repos, setRepos] = useState([]);
@@ -369,10 +464,10 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
         active,
         label: String(tree.data.title),
         detail: `${d}/${nodes.length} odkryte`,
-        onClick: () => useNav.setState({ treeId: tree.id, sel: null }),
+        onClick: () => useNav.setState({ treeId: tree.id, sel: null, phase: "map" }),
         action: /* @__PURE__ */ jsx(ui.RemoveButton, { onClick: () => {
           store.remove(tree.id);
-          if (active) useNav.setState({ treeId: null, sel: null });
+          if (active) useNav.setState({ treeId: null, sel: null, phase: "map" });
         } })
       }
     );
@@ -381,17 +476,14 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
     const { treeId } = useNav();
     const trees = store.usePosts("tree");
     if (!trees.length) return null;
-    return /* @__PURE__ */ jsx(ui.Page, { children: /* @__PURE__ */ jsxs(ui.Stack, { children: [
-      /* @__PURE__ */ jsx(ui.Heading, { title: "Drzewa wiedzy" }),
-      trees.map((t) => /* @__PURE__ */ jsx(TreeItem, { tree: t, active: treeId === t.id }, t.id))
-    ] }) });
+    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Drzewa wiedzy" }), body: /* @__PURE__ */ jsx(ui.Stack, { children: trees.map((t) => /* @__PURE__ */ jsx(TreeItem, { tree: t, active: treeId === t.id }, t.id)) }), grow: true });
   }
   function Progress() {
     const { treeId } = useNav();
     const nodes = store.useChildren(treeId || "", "node");
     if (!treeId) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Wybierz drzewo" });
     const d = nodes.filter((n) => Number(n.data.hits) > 0);
-    return /* @__PURE__ */ jsx(ui.Page, { children: /* @__PURE__ */ jsxs(ui.Stack, { children: [
+    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Postęp" }), body: /* @__PURE__ */ jsxs(ui.Stack, { children: [
       /* @__PURE__ */ jsxs(ui.Stats, { children: [
         /* @__PURE__ */ jsx(ui.Stat, { label: "Odkryte", value: `${d.length}/${nodes.length}` }),
         /* @__PURE__ */ jsx(ui.Stat, { label: "Opanowane", value: nodes.filter((n) => str(n) >= 1).length })
@@ -401,22 +493,25 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
         str(n) >= 1 ? /* @__PURE__ */ jsx(Star, { size: 12 }) : /* @__PURE__ */ jsx(Check, { size: 12 }),
         /* @__PURE__ */ jsx(ui.Text, { size: "sm", children: String(n.data.title) })
       ] }, n.id))
-    ] }) });
+    ] }), grow: true });
   }
   function Center() {
-    const { treeId } = useNav();
+    const { treeId, phase, sel } = useNav();
     const trees = store.usePosts("tree");
+    useEffect(() => {
+      if (!treeId && trees.length) useNav.setState({ treeId: trees[0].id });
+    }, [treeId, trees.length]);
     if (!treeId && !trees.length) return /* @__PURE__ */ jsx(RepoPicker, {});
-    if (!treeId && trees.length) {
-      useNav.setState({ treeId: trees[0].id });
-      return null;
-    }
-    return /* @__PURE__ */ jsx(ui.Page, { children: /* @__PURE__ */ jsx(ui.Stack, { children: /* @__PURE__ */ jsx(SkillTree, {}) }) });
+    if (!treeId) return null;
+    return /* @__PURE__ */ jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }, children: [
+      /* @__PURE__ */ jsx("div", { style: { flex: 1, minHeight: 0, overflow: "hidden" }, children: /* @__PURE__ */ jsx(SkillTree, {}) }),
+      phase === "detail" && sel && /* @__PURE__ */ jsx(NodeDetail, { id: sel })
+    ] });
   }
   sdk.registerView("bq.left", { slot: "left", component: TreeList });
   sdk.registerView("bq.center", { slot: "center", component: Center });
   sdk.registerView("bq.right", { slot: "right", component: Progress });
-  return { id: "plugin-brain-quest", label: "BrainQuest", icon: Award, version: "0.3.0" };
+  return { id: "plugin-brain-quest", label: "BrainQuest", icon: Award, version: "0.4.0" };
 };
 export {
   plugin as default

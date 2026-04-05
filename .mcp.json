@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "obieg-deploy": {
+      "command": "node",
+      "args": ["/home/dadmor/code/obirg-zero/packages/mcp-deploy/dist/index.js"]
+    }
+  }
+}
