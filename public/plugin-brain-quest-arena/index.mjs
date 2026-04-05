@@ -1,7 +1,7 @@
 import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 const plugin = ({ React, ui, store, sdk, icons }) => {
   const { useState, useEffect, useMemo, useCallback, useRef } = React;
-  const { Zap, Heart, Target, Award, RotateCcw, ArrowLeft } = icons;
+  const { Zap, Heart, Award, RotateCcw, ArrowLeft } = icons;
   const HOLE_COUNT = 6;
   const ROUND_TIME = 60;
   const START_HP = 5;
@@ -45,13 +45,11 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
     holeTermIds: []
   }));
   const colors = {
-    hole: "#1e293b",
-    holeRim: "#334155",
-    pop: "#3b82f6",
-    popCorrect: "#22c55e",
-    popWrong: "#ef4444",
-    hp: "#ef4444",
-    muted: "#64748b"
+    hole: "var(--color-base-200)",
+    holeRim: "var(--color-base-300)",
+    pop: "var(--color-primary)",
+    popCorrect: "var(--color-success)",
+    popWrong: "var(--color-error)"
   };
   const jparse = (s, fb) => {
     try {
@@ -67,7 +65,7 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
     const postId = (bq == null ? void 0 : bq.postId) || "";
     const isChallenge = !!(bq == null ? void 0 : bq.challenge);
     const lexicon = store.useChildren(treeId, "lexicon");
-    const node = store.usePost(postId);
+    store.usePost(postId);
     const { phase } = useGame();
     const nodeId = (bq == null ? void 0 : bq.nodeId) || "";
     const gameLexicon = useMemo(() => {
@@ -86,33 +84,12 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
         " Wróć do drzewa"
       ] })
     ] }) });
-    if (isChallenge && phase === "menu") return /* @__PURE__ */ jsx(ChallengeIntro, { node, lexicon: gameLexicon });
+    useEffect(() => {
+      if (isChallenge && phase === "menu") useGame.setState(freshGame());
+    }, [isChallenge, phase]);
     if (phase === "menu") return /* @__PURE__ */ jsx(MenuScreen, { lexicon: gameLexicon });
     if (phase === "playing") return /* @__PURE__ */ jsx(GameScreen, { lexicon: gameLexicon });
     return /* @__PURE__ */ jsx(SummaryScreen, {});
-  }
-  function ChallengeIntro({ node, lexicon }) {
-    const title = node ? String(node.data.title) : "???";
-    return /* @__PURE__ */ jsx(ui.Page, { children: /* @__PURE__ */ jsx(ui.Stage, { children: /* @__PURE__ */ jsx(
-      ui.StageLayout,
-      {
-        top: /* @__PURE__ */ jsxs(ui.Stack, { gap: "md", children: [
-          /* @__PURE__ */ jsx(ui.StepHeading, { title, subtitle: `Traf ${WIN_THRESHOLD}x by odblokować` }),
-          /* @__PURE__ */ jsxs(ui.Stats, { children: [
-            /* @__PURE__ */ jsx(ui.Stat, { title: "Terminy", value: lexicon.length }),
-            /* @__PURE__ */ jsx(ui.Stat, { title: "Życia", value: START_HP }),
-            /* @__PURE__ */ jsx(ui.Stat, { title: "Czas", value: `${ROUND_TIME}s` })
-          ] })
-        ] }),
-        bottom: /* @__PURE__ */ jsxs(ui.Stack, { children: [
-          /* @__PURE__ */ jsx(ui.Button, { size: "lg", color: "primary", block: true, onClick: () => useGame.setState(freshGame()), children: "DO BOJU!" }),
-          /* @__PURE__ */ jsxs(ui.Button, { size: "lg", outline: true, block: true, onClick: backToTree, children: [
-            /* @__PURE__ */ jsx(ArrowLeft, { size: 14 }),
-            " Wróć"
-          ] })
-        ] })
-      }
-    ) }) });
   }
   function MenuScreen({ lexicon }) {
     const { mode } = useGame();
@@ -265,7 +242,7 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       alignItems: "center",
       justifyContent: "center",
       cursor: (hole == null ? void 0 : hole.visible) && !hole.hit && !hole.wrong ? "pointer" : "default",
-      border: `3px solid ${!(hole == null ? void 0 : hole.visible) ? colors.holeRim : hole.hit ? "#16a34a" : hole.wrong ? "#dc2626" : "#2563eb"}`,
+      border: `3px solid ${!(hole == null ? void 0 : hole.visible) ? colors.holeRim : hole.hit ? "var(--color-success)" : hole.wrong ? "var(--color-error)" : "var(--color-primary)"}`,
       transition: "all 0.15s ease",
       transform: shakeHole === i ? "translateX(4px)" : (hole == null ? void 0 : hole.visible) ? "scale(1.05)" : "scale(0.95)",
       opacity: (hole == null ? void 0 : hole.visible) ? 1 : 0.4,
@@ -293,9 +270,9 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
               timeLeft,
               "s"
             ] }),
-            /* @__PURE__ */ jsx(ui.Row, { gap: "sm", children: Array.from({ length: START_HP }, (_, i) => /* @__PURE__ */ jsx("span", { style: { color: i < hp ? colors.hp : colors.muted }, children: /* @__PURE__ */ jsx(Heart, { size: 16 }) }, i)) })
+            /* @__PURE__ */ jsx(ui.Row, { gap: "sm", children: Array.from({ length: START_HP }, (_, i) => /* @__PURE__ */ jsx("span", { style: { color: "var(--color-error)", opacity: i < hp ? 1 : 0.2 }, children: /* @__PURE__ */ jsx(Heart, { size: 16 }) }, i)) })
           ] }),
-          progress !== null && /* @__PURE__ */ jsx("div", { style: { background: "#1e293b", borderRadius: "8px", height: "8px", overflow: "hidden" }, children: /* @__PURE__ */ jsx("div", { style: { width: `${progress * 100}%`, height: "100%", background: progress >= 1 ? "#22c55e" : "#f59e0b", transition: "width 0.3s ease" } }) }),
+          progress !== null && /* @__PURE__ */ jsx("div", { style: { background: "var(--color-base-200)", borderRadius: "8px", height: "8px", overflow: "hidden" }, children: /* @__PURE__ */ jsx("div", { style: { width: `${progress * 100}%`, height: "100%", background: progress >= 1 ? "var(--color-success)" : "var(--color-warning)", transition: "width 0.3s ease" } }) }),
           /* @__PURE__ */ jsx(ui.Card, { children: /* @__PURE__ */ jsxs(ui.Stack, { children: [
             /* @__PURE__ */ jsxs(ui.Row, { justify: "between", children: [
               /* @__PURE__ */ jsxs(ui.Row, { gap: "sm", children: [
@@ -317,7 +294,7 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
           ] }) }),
           /* @__PURE__ */ jsx("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", width: "100%" }, children: Array.from({ length: HOLE_COUNT }, (_, idx) => {
             const hole = holes[idx];
-            return /* @__PURE__ */ jsx("div", { style: holeStyle(hole, idx), onClick: () => whack(idx), children: (hole == null ? void 0 : hole.visible) ? /* @__PURE__ */ jsx("span", { style: { color: "#fff", fontSize: "13px", fontWeight: 600, lineHeight: 1.2 }, children: hole.term }) : /* @__PURE__ */ jsx("span", { style: { color: colors.muted, fontSize: "24px" }, children: "?" }) }, idx);
+            return /* @__PURE__ */ jsx("div", { style: holeStyle(hole, idx), onClick: () => whack(idx), children: (hole == null ? void 0 : hole.visible) ? /* @__PURE__ */ jsx(ui.Text, { size: "xs", bold: true, children: hole.term }) : /* @__PURE__ */ jsx(ui.Text, { muted: true, children: "?" }) }, idx);
           }) })
         ] })
       }
@@ -416,27 +393,14 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       /* @__PURE__ */ jsx(ui.Text, { size: "xs", muted: true, children: t.definition })
     ] }) }, t.id)) }), grow: true });
   }
-  function Progress() {
-    const bq = useBq();
-    const treeId = (bq == null ? void 0 : bq.treeId) || "";
-    const nodes = store.useChildren(treeId, "node");
-    if (!treeId) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Wybierz drzewo" });
-    const str = (n) => Math.min((Number(n.data.hits) || 0) / 5, 1);
-    const d = nodes.filter((n) => Number(n.data.hits) > 0);
-    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Postęp" }), body: d.length === 0 ? /* @__PURE__ */ jsx(ui.Placeholder, { text: "Odkrywaj węzły na mapie", children: /* @__PURE__ */ jsx(Award, { size: 32 }) }) : /* @__PURE__ */ jsxs(ui.Stack, { children: [
-      /* @__PURE__ */ jsxs(ui.Stats, { children: [
-        /* @__PURE__ */ jsx(ui.Stat, { title: "Odkryte", value: `${d.length}/${nodes.length}` }),
-        /* @__PURE__ */ jsx(ui.Stat, { title: "Opanowane", value: `${nodes.filter((n) => str(n) >= 1).length}` })
-      ] }),
-      d.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8).map((n) => /* @__PURE__ */ jsxs(ui.Row, { gap: "sm", children: [
-        str(n) >= 1 ? /* @__PURE__ */ jsx(Award, { size: 12 }) : /* @__PURE__ */ jsx(Zap, { size: 12 }),
-        /* @__PURE__ */ jsx(ui.Text, { size: "sm", children: String(n.data.title) })
-      ] }, n.id))
-    ] }), grow: true });
-  }
+  const SharedProgress = () => {
+    var _a, _b;
+    const P = (_b = (_a = sdk.shared.getState()) == null ? void 0 : _a.bqHelpers) == null ? void 0 : _b.Progress;
+    return P ? /* @__PURE__ */ jsx(P, {}) : null;
+  };
   sdk.registerView("bqa.left", { slot: "left", component: CheatSheet });
   sdk.registerView("bqa.center", { slot: "center", component: Arena });
-  sdk.registerView("bqa.right", { slot: "right", component: Progress });
+  sdk.registerView("bqa.right", { slot: "right", component: SharedProgress });
   return { id: "plugin-brain-quest-arena", label: "BQ Arena", icon: Zap, version: "0.4.0" };
 };
 export {

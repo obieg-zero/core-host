@@ -1,7 +1,7 @@
 import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 const plugin = ({ React, ui, store, sdk, icons }) => {
   const { useState, useMemo, useEffect } = React;
-  const { BookOpen, ChevronLeft, ChevronRight, X, Link2 } = icons;
+  const { BookOpen, ChevronLeft, X, Link2 } = icons;
   const useLocal = sdk.create(() => ({
     slideIdx: 0,
     activeTermId: null,
@@ -77,10 +77,11 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
     var _a;
     return ((_a = helpers()) == null ? void 0 : _a.edgeStr(disc)) ?? 0;
   };
+  const hl = { padding: "1px 3px", borderRadius: "3px", cursor: "pointer" };
   const highlightStyle = (strength) => {
-    if (strength === void 0) return { background: "rgba(100,116,139,0.25)", padding: "1px 3px", borderRadius: "3px", cursor: "pointer" };
-    if (strength >= 0.8) return { background: "rgba(34,197,94,0.6)", padding: "1px 3px", borderRadius: "3px", cursor: "pointer", fontWeight: 600 };
-    return { background: `rgba(34,197,94,${0.15 + strength * 0.55})`, padding: "1px 3px", borderRadius: "3px", cursor: "pointer" };
+    if (strength === void 0) return { ...hl, background: "color-mix(in oklch, var(--color-base-content) 20%, transparent)" };
+    if (strength >= 0.8) return { ...hl, background: "color-mix(in oklch, var(--color-success) 60%, transparent)", fontWeight: 600 };
+    return { ...hl, background: `color-mix(in oklch, var(--color-success) ${15 + Math.round(strength * 55)}%, transparent)` };
   };
   function InlineMarkdown({ text, lexicon }) {
     const parts = [];
@@ -195,6 +196,7 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       const options = [correct, ...wrong].map((n) => ({ id: n.id, title: String(n.data.title) })).sort(() => Math.random() - 0.5);
       if (options.length < 2) continue;
       challenges.push({
+        termId: linkTerm.id,
         contextTitle: termName,
         contextType: String(correct.data.branch || ""),
         currentNodeTitle: nodeTitle,
@@ -248,7 +250,7 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
               if (connectionRevealed) return;
               useLocal.setState({ connectionAnswer: opt.id, connectionRevealed: true });
               if (opt.id === challenge.correctNodeId) {
-                (_a = helpers()) == null ? void 0 : _a.discover(challenge.correctNodeId);
+                (_a = helpers()) == null ? void 0 : _a.discover(challenge.termId);
               }
             },
             children: [
@@ -401,28 +403,15 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       /* @__PURE__ */ jsx(ui.Text, { size: "xs", muted: true, children: t.definition })
     ] }) }, t.id)) }), grow: true });
   }
-  function Progress() {
-    const bq = sdk.shared((s) => s == null ? void 0 : s.bq);
-    const treeId = (bq == null ? void 0 : bq.treeId) || "";
-    const nodes = store.useChildren(treeId, "node");
-    if (!treeId) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Wybierz drzewo" });
-    const str = (n) => Math.min((Number(n.data.hits) || 0) / 5, 1);
-    const d = nodes.filter((n) => Number(n.data.hits) > 0);
-    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Postęp" }), body: d.length === 0 ? /* @__PURE__ */ jsx(ui.Placeholder, { text: "Odkrywaj węzły na mapie", children: /* @__PURE__ */ jsx(icons.Award, { size: 32 }) }) : /* @__PURE__ */ jsxs(ui.Stack, { children: [
-      /* @__PURE__ */ jsxs(ui.Stats, { children: [
-        /* @__PURE__ */ jsx(ui.Stat, { title: "Odkryte", value: `${d.length}/${nodes.length}` }),
-        /* @__PURE__ */ jsx(ui.Stat, { title: "Opanowane", value: `${nodes.filter((n) => str(n) >= 1).length}` })
-      ] }),
-      d.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8).map((n) => /* @__PURE__ */ jsxs(ui.Row, { gap: "sm", children: [
-        str(n) >= 1 ? /* @__PURE__ */ jsx(icons.Award, { size: 12 }) : /* @__PURE__ */ jsx(icons.Zap, { size: 12 }),
-        /* @__PURE__ */ jsx(ui.Text, { size: "sm", children: String(n.data.title) })
-      ] }, n.id))
-    ] }), grow: true });
-  }
+  const SharedProgress = () => {
+    var _a, _b;
+    const P = (_b = (_a = sdk.shared.getState()) == null ? void 0 : _a.bqHelpers) == null ? void 0 : _b.Progress;
+    return P ? /* @__PURE__ */ jsx(P, {}) : null;
+  };
   sdk.registerView("bqr.left", { slot: "left", component: LeftPanel });
   sdk.registerView("bqr.center", { slot: "center", component: SlideReader });
-  sdk.registerView("bqr.right", { slot: "right", component: Progress });
-  return { id: "plugin-brain-quest-reader", label: "BQ Czytnik", icon: BookOpen, version: "0.3.0" };
+  sdk.registerView("bqr.right", { slot: "right", component: SharedProgress });
+  return { id: "plugin-brain-quest-reader", label: "BQ Czytnik", icon: BookOpen, version: "0.4.0" };
 };
 export {
   plugin as default

@@ -3,7 +3,7 @@ const GH_API = "https://api.github.com";
 const GH_RAW = "https://raw.githubusercontent.com";
 const plugin = ({ React, ui, store, sdk, icons }) => {
   const { useState, useMemo, useCallback, useRef, useEffect } = React;
-  const { Award, Star, Check, X, Zap } = icons;
+  const { Award, X, Zap } = icons;
   store.registerType("tree", [
     { key: "title", label: "Tytuł", required: true },
     { key: "branches", label: "Gałęzie" },
@@ -73,6 +73,7 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
     const { treeId, sel, phase } = useNav();
     const tree = store.usePost(treeId || "");
     const nodes = store.useChildren(treeId || "", "node");
+    const [revealed, setRevealed] = useState(() => /* @__PURE__ */ new Set());
     const flash = sdk.shared((s) => s == null ? void 0 : s.bqFlash);
     const [discoveredPairs, setDiscoveredPairs] = useState([]);
     useEffect(() => {
@@ -184,6 +185,14 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       }
       return pairs;
     }, [discoveries, terms, visible]);
+    const C = {
+      bg: "var(--color-base-200)",
+      edge: "var(--color-base-content)",
+      warn: "var(--color-warning)",
+      text: "var(--color-base-content)",
+      ring: "var(--color-base-content)",
+      muted: "var(--color-base-300)"
+    };
     const focusNid = sel ? (() => {
       const n = store.get(sel);
       return n ? String(n.data.nodeId) : rootNid;
@@ -193,65 +202,80 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
     const camRef = useRef({ x: snapTo.x, y: snapTo.y });
     const dragRef = useRef(null);
     const viewR = 300;
-    const prevSel = useRef(sel);
-    if (sel !== prevSel.current) {
-      prevSel.current = sel;
-      camRef.current = { x: snapTo.x, y: snapTo.y };
-    }
     const setVB = () => {
       var _a;
       const c = camRef.current;
       (_a = svgRef.current) == null ? void 0 : _a.setAttribute("viewBox", `${c.x - viewR} ${c.y - viewR} ${viewR * 2} ${viewR * 2}`);
     };
+    const animRef = useRef(0);
+    const prevSel = useRef(sel);
+    if (sel !== prevSel.current) {
+      prevSel.current = sel;
+      const from = { ...camRef.current }, to = snapTo;
+      cancelAnimationFrame(animRef.current);
+      let t = 0;
+      const step = () => {
+        t = Math.min(t + 0.06, 1);
+        const e = t * (2 - t);
+        camRef.current = { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e };
+        setVB();
+        if (t < 1) animRef.current = requestAnimationFrame(step);
+      };
+      animRef.current = requestAnimationFrame(step);
+    }
     useEffect(setVB, [sel]);
     const vb = `${camRef.current.x - viewR} ${camRef.current.y - viewR} ${viewR * 2} ${viewR * 2}`;
-    const onDown = useCallback((e) => {
-      const svg = e.currentTarget, rect = svg.getBoundingClientRect();
+    const startDrag = useCallback((clientX, clientY) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
       const scale = viewR * 2 / rect.width;
-      dragRef.current = { sx: e.clientX, sy: e.clientY, cx: camRef.current.x, cy: camRef.current.y };
-      const onMove = (ev) => {
+      dragRef.current = { sx: clientX, sy: clientY, cx: camRef.current.x, cy: camRef.current.y };
+      const move = (cx, cy) => {
         const d = dragRef.current;
         if (!d) return;
-        camRef.current = { x: d.cx - (ev.clientX - d.sx) * scale, y: d.cy - (ev.clientY - d.sy) * scale };
+        camRef.current = { x: d.cx - (cx - d.sx) * scale, y: d.cy - (cy - d.sy) * scale };
         setVB();
       };
-      const onUp = () => {
-        dragRef.current = null;
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
+      const onMM = (ev) => move(ev.clientX, ev.clientY);
+      const onTM = (ev) => {
+        ev.preventDefault();
+        move(ev.touches[0].clientX, ev.touches[0].clientY);
       };
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
+      const up = () => {
+        dragRef.current = null;
+        window.removeEventListener("mousemove", onMM);
+        window.removeEventListener("mouseup", up);
+        window.removeEventListener("touchmove", onTM);
+        window.removeEventListener("touchend", up);
+      };
+      window.addEventListener("mousemove", onMM);
+      window.addEventListener("mouseup", up);
+      window.addEventListener("touchmove", onTM, { passive: false });
+      window.addEventListener("touchend", up);
     }, [viewR]);
     if (!treeId) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Wybierz drzewo z listy" });
     if (!nodes.length) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Zaimportuj paczkę bazową" });
     const visNodes = nodes.filter((n) => visible.has(String(n.data.nodeId)));
     const visEdges = edges.filter((e) => visible.has(e.from) && visible.has(e.to));
+    const isEmpty = !discovered.size;
     return /* @__PURE__ */ jsxs(
       "svg",
       {
         ref: svgRef,
         viewBox: vb,
-        style: { width: "100%", height: "100%", cursor: "grab", userSelect: "none", display: "block" },
-        onMouseDown: onDown,
+        style: { width: "100%", height: "100%", cursor: "grab", userSelect: "none", display: "block", touchAction: "none" },
+        onMouseDown: (e) => startDrag(e.clientX, e.clientY),
+        onTouchStart: (e) => startDrag(e.touches[0].clientX, e.touches[0].clientY),
         children: [
-          /* @__PURE__ */ jsxs("defs", { children: [
-            /* @__PURE__ */ jsxs("filter", { id: "glow", children: [
-              /* @__PURE__ */ jsx("feGaussianBlur", { stdDeviation: "3", result: "blur" }),
-              /* @__PURE__ */ jsxs("feMerge", { children: [
-                /* @__PURE__ */ jsx("feMergeNode", { in: "blur" }),
-                /* @__PURE__ */ jsx("feMergeNode", { in: "SourceGraphic" })
-              ] })
-            ] }),
-            /* @__PURE__ */ jsxs("filter", { id: "flashGlow", children: [
-              /* @__PURE__ */ jsx("feGaussianBlur", { stdDeviation: "6", result: "blur" }),
-              /* @__PURE__ */ jsxs("feMerge", { children: [
-                /* @__PURE__ */ jsx("feMergeNode", { in: "blur" }),
-                /* @__PURE__ */ jsx("feMergeNode", { in: "blur" }),
-                /* @__PURE__ */ jsx("feMergeNode", { in: "SourceGraphic" })
-              ] })
+          /* @__PURE__ */ jsx("defs", { children: /* @__PURE__ */ jsxs("filter", { id: "glow", children: [
+            /* @__PURE__ */ jsx("feGaussianBlur", { stdDeviation: "3", result: "blur" }),
+            /* @__PURE__ */ jsxs("feMerge", { children: [
+              /* @__PURE__ */ jsx("feMergeNode", { in: "blur" }),
+              /* @__PURE__ */ jsx("feMergeNode", { in: "SourceGraphic" })
             ] })
-          ] }),
+          ] }) }),
+          isEmpty && /* @__PURE__ */ jsx("text", { x: camRef.current.x, y: camRef.current.y + 50, textAnchor: "middle", style: { fill: C.text, opacity: 0.3 }, fontSize: 12, children: "Kliknij węzeł aby rozpocząć" }),
           discoveredPairs.map((pair, i) => {
             const f = layout.get(pair.fromNid), t = layout.get(pair.toNid);
             if (!f || !t) return null;
@@ -263,7 +287,7 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
                   y1: f.y,
                   x2: t.x,
                   y2: t.y,
-                  stroke: "#f59e0b",
+                  style: { stroke: C.warn },
                   strokeWidth: pair.fresh ? 4 : 3,
                   opacity: pair.fresh ? 0.8 : 0.5,
                   filter: "url(#glow)",
@@ -271,11 +295,11 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
                 }
               ),
               pair.fresh && /* @__PURE__ */ jsxs(Fragment, { children: [
-                /* @__PURE__ */ jsxs("circle", { cx: f.x, cy: f.y, r: 28, fill: "none", stroke: "#f59e0b", strokeWidth: 2, children: [
+                /* @__PURE__ */ jsxs("circle", { cx: f.x, cy: f.y, r: 28, fill: "none", style: { stroke: C.warn }, strokeWidth: 2, children: [
                   /* @__PURE__ */ jsx("animate", { attributeName: "r", values: "25;35;28", dur: "1s", repeatCount: "3", fill: "freeze" }),
                   /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "0.8;0.3;0.4", dur: "1s", repeatCount: "3", fill: "freeze" })
                 ] }),
-                /* @__PURE__ */ jsxs("circle", { cx: t.x, cy: t.y, r: 28, fill: "none", stroke: "#f59e0b", strokeWidth: 2, children: [
+                /* @__PURE__ */ jsxs("circle", { cx: t.x, cy: t.y, r: 28, fill: "none", style: { stroke: C.warn }, strokeWidth: 2, children: [
                   /* @__PURE__ */ jsx("animate", { attributeName: "r", values: "25;35;28", dur: "1s", repeatCount: "3", fill: "freeze" }),
                   /* @__PURE__ */ jsx("animate", { attributeName: "opacity", values: "0.8;0.3;0.4", dur: "1s", repeatCount: "3", fill: "freeze" })
                 ] })
@@ -291,7 +315,7 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
                 y1: f.y,
                 x2: t.x,
                 y2: t.y,
-                stroke: "#f59e0b",
+                style: { stroke: C.warn },
                 strokeWidth: 2,
                 opacity: ce.strength * 0.6,
                 filter: "url(#glow)"
@@ -301,26 +325,27 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
           }),
           visEdges.map((e, i) => {
             const f = layout.get(e.from), t = layout.get(e.to);
-            return f && t ? /* @__PURE__ */ jsx("line", { x1: f.x, y1: f.y, x2: t.x, y2: t.y, stroke: "#475569", strokeWidth: 1.5, opacity: 0.3 }, i) : null;
+            return f && t ? /* @__PURE__ */ jsx("line", { x1: f.x, y1: f.y, x2: t.x, y2: t.y, style: { stroke: C.edge }, strokeWidth: 1.5, opacity: 0.15 }, i) : null;
           }),
           visNodes.map((n) => {
             var _a;
             const nid = String(n.data.nodeId), p = layout.get(nid);
             if (!p) return null;
             const s = str(n), disc = discovered.has(nid), front = frontier.has(nid), mast = s >= 1;
-            const r = mast ? 26 : disc ? 22 : 16;
-            const bc = ((_a = branches[String(n.data.branch)]) == null ? void 0 : _a.color) || "#64748b";
-            const fill = mast ? bc : disc ? bc + "80" : "#1e293b";
+            const r = mast ? 32 : disc ? 28 : 22;
+            const bc = ((_a = branches[String(n.data.branch)]) == null ? void 0 : _a.color) || C.muted;
+            const nodeFill = mast ? bc : disc ? bc : C.bg;
             return /* @__PURE__ */ jsxs("g", { onClick: () => {
               useNav.setState({ sel: n.id, phase: "detail" });
               sdk.shared.setState({ bq: { treeId, nodeId: nid, postId: n.id } });
+              setRevealed((prev) => new Set(prev).add(nid));
             }, style: { cursor: "pointer" }, children: [
-              focusNid === nid && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 8, fill: "none", stroke: "#fff", strokeWidth: 1, opacity: 0.3 }),
-              sel === n.id && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 5, fill: "none", stroke: "#fff", strokeWidth: 2 }),
-              /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r, fill, stroke: mast ? "#fff" : front ? bc + "40" : bc, strokeWidth: 1.5 }),
-              front && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 3, fill: "none", stroke: bc, strokeWidth: 1, strokeDasharray: "4 3", opacity: 0.5 }),
-              /* @__PURE__ */ jsx("text", { x: p.x, y: p.y + 5, textAnchor: "middle", fill: disc ? "#fff" : "#64748b", fontSize: mast ? 14 : 10, children: mast ? "★" : disc ? Number(n.data.hits) : "?" }),
-              /* @__PURE__ */ jsx("text", { x: p.x, y: p.y + r + 14, textAnchor: "middle", fill: disc ? "#e2e8f0" : "#475569", fontSize: 10, children: disc ? String(n.data.title).slice(0, 16) : "???" })
+              focusNid === nid && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 8, fill: "none", style: { stroke: C.ring }, strokeWidth: 1, opacity: 0.3 }),
+              sel === n.id && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 5, fill: "none", style: { stroke: C.ring }, strokeWidth: 2 }),
+              /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r, style: { fill: nodeFill, stroke: mast ? C.ring : front ? bc + "40" : bc }, strokeWidth: 1.5, children: disc && !mast && /* @__PURE__ */ jsx("animate", { attributeName: "r", values: `${r};${r + 2};${r}`, dur: "2s", repeatCount: "1" }) }),
+              front && /* @__PURE__ */ jsx("circle", { cx: p.x, cy: p.y, r: r + 3, fill: "none", style: { stroke: bc }, strokeWidth: 1, strokeDasharray: "4 3", opacity: 0.5 }),
+              /* @__PURE__ */ jsx("text", { x: p.x, y: p.y + 5, textAnchor: "middle", style: { fill: disc ? C.ring : C.edge }, fontSize: mast ? 14 : 10, opacity: disc ? 1 : 0.4, children: mast ? "★" : disc ? Number(n.data.hits) : "?" }),
+              /* @__PURE__ */ jsx("text", { x: p.x, y: p.y + r + 14, textAnchor: "middle", style: { fill: C.text }, fontSize: 10, opacity: disc ? 0.8 : revealed.has(nid) ? 0.5 : 0.3, children: disc || revealed.has(nid) ? String(n.data.title).slice(0, 16) : "???" })
             ] }, n.id);
           })
         ]
@@ -434,7 +459,6 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       sdk.log(`Content ${nodeId}: ${e}`, "error");
     }
   };
-  sdk.shared.setState({ bqHelpers: { discover, unlockNode, edgeStr, loadNodeContent, loadLexiconFromRepo } });
   function RepoPicker() {
     const org = store.useOption("bq:githubOrg") || DEFAULT_ORG;
     const [repos, setRepos] = useState([]);
@@ -479,8 +503,11 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
     return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Drzewa wiedzy" }), body: /* @__PURE__ */ jsx(ui.Stack, { children: trees.map((t) => /* @__PURE__ */ jsx(TreeItem, { tree: t, active: treeId === t.id }, t.id)) }), grow: true });
   }
   function Progress() {
-    const { treeId } = useNav();
-    const nodes = store.useChildren(treeId || "", "node");
+    var _a;
+    const navTreeId = useNav().treeId;
+    const sharedTreeId = (_a = sdk.shared((s) => s == null ? void 0 : s.bq)) == null ? void 0 : _a.treeId;
+    const treeId = navTreeId || sharedTreeId || "";
+    const nodes = store.useChildren(treeId, "node");
     if (!treeId) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Wybierz drzewo" });
     const d = nodes.filter((n) => Number(n.data.hits) > 0);
     return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Postęp" }), body: d.length === 0 ? /* @__PURE__ */ jsx(ui.Placeholder, { text: "Odkrywaj węzły na mapie", children: /* @__PURE__ */ jsx(Award, { size: 32 }) }) : /* @__PURE__ */ jsxs(ui.Stack, { children: [
@@ -494,6 +521,7 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       ] }, n.id))
     ] }), grow: true });
   }
+  sdk.shared.setState({ bqHelpers: { discover, unlockNode, edgeStr, loadNodeContent, loadLexiconFromRepo, jparse, str, Progress } });
   function Center() {
     const { treeId, phase, sel } = useNav();
     const trees = store.usePosts("tree");
@@ -502,9 +530,9 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
     }, [treeId, trees.length]);
     if (!treeId && !trees.length) return /* @__PURE__ */ jsx(RepoPicker, {});
     if (!treeId) return null;
-    return /* @__PURE__ */ jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }, children: [
-      /* @__PURE__ */ jsx("div", { style: { flex: 1, minHeight: 0, overflow: "hidden" }, children: /* @__PURE__ */ jsx(SkillTree, {}) }),
-      phase === "detail" && sel && /* @__PURE__ */ jsx(NodeDetail, { id: sel })
+    return /* @__PURE__ */ jsxs("div", { style: { position: "relative", height: "100%", overflow: "hidden" }, children: [
+      /* @__PURE__ */ jsx(SkillTree, {}),
+      phase === "detail" && sel && /* @__PURE__ */ jsx("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0 }, children: /* @__PURE__ */ jsx(NodeDetail, { id: sel }) })
     ] });
   }
   sdk.registerView("bq.left", { slot: "left", component: TreeList });
